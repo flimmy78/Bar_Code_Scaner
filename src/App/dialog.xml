@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="GB2312"?>
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<!-- 编辑使用 XMLSpy v2006 U (http://www.altova.com) 由 any (any) -->
+<NETCOM>
+	<STRING comment="系统用到的字符串在此定义，以便获取unicode编码，通过如：startup_str来访问">
+		<fengefu english=" " schinese="--------------------------------" tchinese=" "/>
+	</STRING>
+	<DIALOG>
+		<logo comment="主界面" style="STYLE_ICON | STYLE_SHORTCUT" callback="yes">
+			<content_english L1="Home" L2="Options"/>
+			<content_schinese L1=" " L2="选项"/>
+			<jump KEY_ENTER="logo" KEY_EXT_1="scan_func" KEY_EXT_2="data_transfer_func" KEY_EXT_3="terminal_setting" KEY_EXT_4="system_info" KEY_EXT_9="test_menu"/>
+		</logo>
+		<scan_func comment="扫描功能" style="STYLE_ICON | STYLE_SHORTCUT" callback="yes">
+			<content_english L1=" " L2="Options"/>
+			<content_schinese L1="  " L2="选项"/>
+			<jump KEY_ESC="logo" KEY_LEFT_SHOTCUT="scan_option_menu" KEY_EXT_9="input_send_num"/>
+		</scan_func>
+		<data_transfer_func comment="数据传输" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Transfer Mode" L2="         Select   Esc" L3="1 BlueTooth" L4="2 USB Keyboard" L5="3 USB Virtual COM" L6="4 U Disk Mode" L7="5 Batch Mode" L8="6 Import Database" L9="7 Seperator"/>
+			<content_schinese L1="数据传输 " L2="        选择     退出" L3="1 蓝牙" L4="2 USB键盘" L5="3 USB虚拟串口" L6="4 U盘模式" L7="5 脱机存储" L8="6 导入商品信息" L9="7 分隔符设置"/>
+			<jump KEY_ESC="logo" KEY_EXT_1="transfer_bluetooth_option" KEY_EXT_4="transfer_u_disk_option" KEY_EXT_5="transfer_batch_option" KEY_EXT_6="import_database" KEY_EXT_7="seperator_setting"/>
+		</data_transfer_func>
+		<terminal_setting comment="系统设置" style="STYLE_TITLE | STYLE_SHORTCUT" callback="yes">
+			<content_english L1="Terminal Setting" L2="       Select     Esc" L3="1 BlueTooth" L4="2 Language" L5="3 Key Volume" L6="4 Timeout Setting" L7="5 DateTime" L8="6 Default setting"/>
+			<content_schinese L1="系统设置 " L2="        选择     退出" L3="1 条码" L4="2 语言" L5="3 按键音" L6="4 超时设置" L7="5 时间和日期" L8="6 恢复默认设置"/>
+			<jump KEY_ESC="logo" KEY_EXT_1="barcode_option" KEY_EXT_2="language_option" KEY_EXT_3="beeper_vol_option" KEY_EXT_4="timeout_option" KEY_EXT_5="time_date_setting" KEY_EXT_6="default_setting"/>
+		</terminal_setting>
+		<system_info comment="系统信息" style="STYLE_TITLE | STYLE_SHORTCUT" callback="yes">
+			<content_english L1="Info" L2="     Select       Esc" L3="1 Memery Info" L4="2 BlueTooth Info" L5="3 Firmware Version"/>
+			<content_schinese L1="系统信息 " L2="        选择     退出" L3="1 查看内存" L4="2 蓝牙信息" L5="3 版本信息"/>
+			<jump KEY_ESC="logo" KEY_EXT_1="view_memery" KEY_EXT_2="bluetooth_info" KEY_EXT_3="firmware_info" KEY_EXT_9="about_copyright"/>
+		</system_info>
+		<about_copyright comment="系统信息" style="STYLE_SHORTCUT" callback="yes">
+			<jump KEY_ESC="system_info"/>
+		</about_copyright>
+		<scan_option_menu comment="扫描功能的选项菜单" style="STYLE_SHORTCUT" callback="yes">
+			<content_english L1=" " L2="      Select      Esc" L3="1 Quantity Enter " L4="2 Add Time" L5="3 Add  Date" L6="4 Input Barcode" L7="5 Database Query" L8="6 Avoid Dunplication" L9="7 Barcode Statistic" L10="8 Transfer Confirm" L11="9 Delete Scan Record"/>
+			<content_schinese L1="  " L2="        选择     退出" L3="1 数量录入" L4="2 添加扫描时间" L5="3 添加扫描日期" L6="4 输入条码" L7="5 数据库查询" L8="6 防止重复条码" L9="7 条码统计" L10="8 传输确认" L11="9 清除扫描记录"/>
+			<jump KEY_ESC="scan_func" KEY_EXT_1="quantity_enter_menu" KEY_EXT_2="add_time_option" KEY_EXT_3="add_date_option" KEY_EXT_4="input_barcode" KEY_EXT_5="database_query_option" KEY_EXT_6="avoid_dunplication_option" KEY_EXT_7="barcode_statistic_option" KEY_EXT_8="transfer_confirm_option" KEY_EXT_9="clear_scan_record"/>
+		</scan_option_menu>
+		<scan_mode_menu comment="扫描模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Scan Mode" L2="      Select      Esc" L3="1 Good-read Off" L4="2 Momentary" L5="3 Continuous"/>
+			<content_schinese L1="扫描模式 " L2="        选择     退出" L3="1 单次按键触发" L4="2 按键保持" L5="3 连续扫描"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</scan_mode_menu>
+		<quantity_enter_menu comment="数量录入模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Quantity Enter" L2="      Select      Esc" L3="1 Disable" L4="2 Repeat Output " L5="3 Output Quantity"/>
+			<content_schinese L1="数量录入" L2="         选择    退出" L3="1 关闭" L4="2 重复输出条码" L5="3 输出条码数量"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</quantity_enter_menu>
+		<add_time_option comment="手动输入条码的处理界面" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Add Time" L2="       Select     Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="添加时间" L2="        选择     退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</add_time_option>
+		<add_date_option comment="是否需要添加日期" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Add Date" L2="       Select     Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="添加日期" L2="        选择     退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</add_date_option>
+		<input_barcode comment="手动输入条码的处理界面" callback="yes" style="STYLE_SHORTCUT">
+			<edit x="0" y="0" style="EDIT_ALPHA" display_maxlen="20" input_maxlen="30"/>
+			<jump KEY_ESC="scan_option_menu" KEY_EXT_1="scan_func"/>
+		</input_barcode>
+		<input_send_num comment="手动输入发送数量的处理界面" callback="yes" style="STYLE_SHORTCUT">
+			<edit x="0" y="0" style="EDIT_NUM" display_maxlen="6" input_maxlen="6"/>
+			<jump KEY_ESC="scan_func" KEY_EXT_1="modify_num_ack"/>
+		</input_send_num>
+		<seperator_setting comment="设置分隔符的处理界面" callback="yes" style="STYLE_SHORTCUT">
+			<edit x="0" y="0" style="EDIT_ALPHA" display_maxlen="2" input_maxlen="2"/>
+			<jump KEY_ESC="data_transfer_func"/>
+		</seperator_setting>
+		<modify_num_ack comment="确认修改发送数量的处理界面" callback="yes" style="STYLE_SHORTCUT">
+			<content_english L1=" " L2="Yes               No "/>
+			<content_schinese L1="  " L2="是                否"/>
+			<jump KEY_ESC="scan_func" KEY_ENTER="scan_func"/>
+		</modify_num_ack>
+		<database_query_option comment="是否需要开启数据库查询模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Database Query" L2="     Select      Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="数据库查询" L2="        选择    退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</database_query_option>
+		<avoid_dunplication_option comment="是否需要开启防重码功能模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Avoid Dunplicaton" L2="     Select      Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="防止重复条码" L2="        选择    退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</avoid_dunplication_option>
+		<barcode_statistic_option comment="是否需要开启条码统计功能模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Barcode Statistic" L2="     Select      Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="条码统计" L2="        选择    退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</barcode_statistic_option>
+		<transfer_confirm_option comment="是否需要传输确认模式菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Transfer Confirm" L2="     Select      Esc" L3="1 Disbale" L4="2 Enable "/>
+			<content_schinese L1="传输确认" L2="        选择    退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="scan_option_menu"/>
+		</transfer_confirm_option>
+		<language_option comment="语言设置菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Language" L2="      Select      Esc" L3="1 English" L4="2 Simply Chinese"/>
+			<content_schinese L1="语言" L2="        选择     退出" L3="1 英语" L4="2 简体中文"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</language_option>
+		<beeper_vol_option comment="按键音设置菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Key Beeper" L2="      Select      Esc" L3="1 Disable" L4="2 Enable"/>
+			<content_schinese L1="按键音" L2="        选择     退出" L3="1 关闭" L4="2 开启"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</beeper_vol_option>
+		<timeout_option comment="超时设置菜单" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Timeout" L2="      Select      Esc" L3="1 Disbale" L4="2 30s" L5="3 60s" L6="4 2 minutes" L7="5 5 minutes"/>
+			<content_schinese L1="超时设置" L2="        选择     退出" L3="1 关闭" L4="2 30秒" L5="3 60秒" L6="4 2分钟" L7="5 5分钟"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</timeout_option>
+		<transfer_bluetooth_option comment="蓝牙传输模式选项" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="BlueTooth" L2="      Select      Esc" L3="1 Offline Disable " L4="2 Offline Enable "/>
+			<content_schinese L1="蓝牙模式" L2="        选择     退出" L3="1 脱机存储关闭" L4="2 脱机存储开启"/>
+			<jump KEY_ESC="data_transfer_func"/>
+		</transfer_bluetooth_option>
+		<transfer_u_disk_option comment="U盘传输模式选项" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="U Disk" L2="      Select      Esc" L3="1 Create new file" L4="2 File list" L5="3 Format"/>
+			<content_schinese L1="U盘" L2="        选择     退出" L3="1 创建新文件" L4="2 文件列表" L5="3 格式化"/>
+			<jump KEY_ESC="data_transfer_func" KEY_EXT_1="create_new_file" KEY_EXT_2="file_list" KEY_EXT_3="u_disk_format"/>
+		</transfer_u_disk_option>
+		<transfer_batch_option comment="脱机存储传输模式选项" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Offline Data" L2="      Select      Esc" L3="1 Send offline data" L4="2 Interface" L5="3 Batch Data Delete"/>
+			<content_schinese L1="脱机数据处理" L2="        选择     退出" L3="1 发送脱机数据" L4="2 通信接口" L5="3 清除脱机数据"/>
+			<jump KEY_ESC="data_transfer_func" KEY_EXT_1="batch_data_send" KEY_EXT_2="batch_transfer_mode" KEY_EXT_3="batch_data_clear"/>
+		</transfer_batch_option>
+		<import_database comment="导入商品信息" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Import Database" L2="                  Esc"/>
+			<content_schinese L1="导入数据库" L2="                 退出"/>
+			<jump KEY_ESC="data_transfer_func"/>
+		</import_database>
+		<barcode_option comment="条码设置" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Barcode Setting" L2="       Select     Esc" L3="1 Decoder" L4="2 Invalid offset"/>
+			<content_schinese L1="条码设置" L2="       选择      退出" L3="1 解码器" L4="2 有效位设置"/>
+			<jump KEY_ESC="terminal_setting" KEY_EXT_1="decoder_setting" KEY_EXT_2="invalid_offset_setting"/>
+		</barcode_option>
+		<time_date_setting comment="时间设置" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Time/Date" L2="Input             Esc" L3="Set Date/Time:" L4=" " L5="(YYYYMMDDHHMMSS)"/>
+			<content_schinese L1="时间日期" L2="输入             退出" L3="设置日期/时间:" L4=" " L5="(YYYYMMDDHHMMSS)"/>
+			<edit x="0" y="26" style="EDIT_NUM | EDIT_UNDERLINE" display_maxlen="14" input_maxlen="14"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</time_date_setting>
+		<default_setting comment="恢复默认设置" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Default Setting" L2="Cancle          Enter"/>
+			<content_schinese L1="恢复默认设置" L2="取消             确定"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</default_setting>
+		<set_system_password comment="设置系统密码" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="System Password" L2="                  Esc"/>
+			<content_schinese L1="设置系统密码" L2="                 退出"/>
+			<jump KEY_ESC="terminal_setting"/>
+		</set_system_password>
+		<decoder_setting comment="解码器设置" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Decoder Setting" L2="      On/Off     Esc" L3="EAN8/13/128" L4="UPCA/C/E/E1" L5="Code39" L6="Code93" L7="Code11" L8="Code128" L9="Interleaved 2/5" L10="Matrix 2/5" L11="Industry 2/5" L12="MSI" L13="RSS14/Limited/Ex" L14="Chinapost"/>
+			<content_schinese L1="解码器设置" L2="       开/关     退出" L3="EAN8/13/128" L4="UPCA/E/E1" L5="Code39" L6="Code93" L7="Code11" L8="Code128" L9="Interleaved 2/5" L10="Matrix 2/5" L11="Industry 2/5" L12="MSI" L13="RSS14/Limited/Ex" L14="Chinapost"/>
+			<jump KEY_ESC="barcode_option"/>
+		</decoder_setting>
+		<invalid_offset_setting comment="有效位数设置" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Invalid Offset" L2="Input            Esc" L3="Input BeginOff:" L4="Input End Off:"/>
+			<content_schinese L1="有效位数" L2="输入             退出" L3="输入起始有效位:" L4="输入结束有效位:"/>
+			<edit x="90" y="13" style="EDIT_NUM" display_maxlen="2" input_maxlen="2"/>
+			<edit1 x="90" y="26" style="EDIT_NUM" display_maxlen="2" input_maxlen="2"/>
+			<jump KEY_ESC="barcode_option"/>
+		</invalid_offset_setting>
+		<batch_data_send comment="脱机数据传输" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Batch Trans" L2="                  Esc"/>
+			<content_schinese L1="脱机数据传输" L2="                 返回"/>
+			<jump KEY_ESC="transfer_batch_option" KEY_RIGHT_SHOTCUT="transfer_batch_option"/>
+		</batch_data_send>
+		<batch_transfer_mode comment="数据传输" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Batch Trans Mode" L2="         Select   Esc" L3="1 BlueTooth" L4="2 USB Keyboard" L5="3 USB Virtual COM"/>
+			<content_schinese L1="脱机数据通信接口 " L2="        选择     退出" L3="1 蓝牙" L4="2 USB键盘" L5="3 USB虚拟串口"/>
+			<jump KEY_ESC="transfer_batch_option"/>
+		</batch_transfer_mode>
+		<batch_data_clear comment="脱机数据清除" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Batch clear" L2="Cancle          Enter"/>
+			<content_schinese L1="记录清除" L2="取消             确定"/>
+			<jump KEY_ESC="transfer_batch_option" KEY_LEFT_SHOTCUT="transfer_batch_option"/>
+		</batch_data_clear>
+		<clear_scan_record comment="清除扫描数据" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Record clear" L2="Cancle          Enter"/>
+			<content_schinese L1="记录清除" L2="取消             确定"/>
+			<jump KEY_LEFT_SHOTCUT="scan_option_menu" KEY_ESC="scan_option_menu"/>
+		</clear_scan_record>
+		<view_memery comment="查看内存" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Memory" L2="                  Esc"/>
+			<content_schinese L1="内存信息" L2="                 返回"/>
+			<jump KEY_ESC="system_info" KEY_RIGHT_SHOTCUT="system_info"/>
+		</view_memery>
+		<bluetooth_info comment="蓝牙版本信息" style="STYLE_TITLE | STYLE_SHORTCUT" callback="yes">
+			<content_english L1="About Bluetooth" L2="                  Esc"/>
+			<content_schinese L1="关于蓝牙" L2="                 返回"/>
+			<jump KEY_ESC="system_info" KEY_RIGHT_SHOTCUT="system_info"/>
+		</bluetooth_info>
+		<firmware_info comment="固件版本" style="STYLE_TITLE | STYLE_SHORTCUT" callback="yes">
+			<content_english L1="Version" L2="                  Esc"/>
+			<content_schinese L1="版本信息 " L2="                 返回"/>
+			<jump KEY_ESC="system_info" KEY_RIGHT_SHOTCUT="system_info"/>
+		</firmware_info>
+		<create_new_file comment="创建新文件" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="New File" L2="Input  Creat   Cancle" L3="Input file name:" L4=" " L5="Only Creat Txt File"/>
+			<content_schinese L1="创建文件" L2="输入    确定     取消" L3="请输入文件名:" L4=" " L5="默认建立txt文件"/>
+			<edit x="0" y="26" style="EDIT_ALPHA" display_maxlen="8" input_maxlen="8"/>
+			<jump KEY_ENTER="transfer_u_disk_option" KEY_ESC="transfer_u_disk_option" KEY_EXT_1="create_new_file"/>
+		</create_new_file>
+		<file_list comment="文件列表" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="File List" L2="Options  Select  Esc "/>
+			<content_schinese L1="文件列表" L2="选项    选择     返回"/>
+			<jump KEY_ENTER="transfer_u_disk_option" KEY_ESC="transfer_u_disk_option" KEY_LEFT_SHOTCUT="file_options_menu"/>
+		</file_list>
+		<u_disk_format comment="u盘格式化" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Format" L2="Yes                No"/>
+			<content_schinese L1="格式化" L2="是                否"/>
+			<jump KEY_ENTER="transfer_u_disk_option" KEY_ESC="transfer_u_disk_option"/>
+		</u_disk_format>
+		<file_options_menu comment="文件操作选项" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Options" L2="                 Esc" L3="1 Clear file" L4="2 Delete file"/>
+			<content_schinese L1="选项" L2="                返回" L3="1 清空文件 " L4="2 删除文件"/>
+			<jump KEY_EXT_1="clear_file_ack" KEY_EXT_2="delete_file_ack" KEY_ESC="transfer_u_disk_option"/>
+		</file_options_menu>
+		<clear_file_ack comment="清空文件" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Clear file" L2="Yes               No "/>
+			<content_schinese L1="清空文件" L2="是                否"/>
+			<jump KEY_ENTER="file_options_menu" KEY_ESC="file_options_menu"/>
+		</clear_file_ack>
+		<delete_file_ack comment="删除文件" callback="yes" style="STYLE_TITLE | STYLE_SHORTCUT">
+			<content_english L1="Delete file" L2="Yes               No "/>
+			<content_schinese L1="删除文件" L2="是                否"/>
+			<jump KEY_ENTER="file_options_menu" KEY_ESC="file_options_menu"/>
+		</delete_file_ack>
+		<test_menu comment="测试菜单" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="返回" L3="1.工厂测试" L4="2.老化测试"/>
+			<jump KEY_ESC="logo" KEY_EXT_1="test_lcd_display" KEY_EXT_2="age_test_menu"/>
+		</test_menu>
+		<age_test_menu comment="老化测试菜单" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="返回" L3="1.扫描老化测试" L4="2.蓝牙老化测试" L5="3.扫描传输测试"/>
+			<jump KEY_ESC="logo" KEY_EXT_1="age_test_menu"/>
+		</age_test_menu>
+		<single_test_menu comment="单项测试菜单" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="返回" L3="1.显示测试" L4="2.键盘测试" L5="3.扫描测试" L6="4.蓝牙测试" L7="5.USB测试" L8="6.RTC测试" L9="7.电池电压检测"/>
+			<jump KEY_ESC="logo"/>
+		</single_test_menu>
+		<test_lcd_display comment="背光控制测试" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="                确认" L3="按下SCAN键之后将开始" L4="     做显示检测" L5="                    " L6="再次按下SCAN继续测试"/>
+			<jump KEY_ENTER="test_keypad"/>
+		</test_lcd_display>
+		<test_keypad comment="按键测试" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="                确认" L3="按下相应的键，相应的" L4="键名就会在屏幕上消失" L5=""/>
+			<jump KEY_ENTER="test_scaner_init"/>
+		</test_keypad>
+		<test_scaner_init comment="扫描头测试" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="                确认" L3="按下SCAN键测试扫描头" L4=" "/>
+			<jump KEY_ENTER="test_usb"/>
+		</test_scaner_init>
+		<test_usb comment="usb连接测试" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1=" " L2="                确认" L3="按下SCAN键测试USB"/>
+			<jump KEY_ENTER="test_rtc"/>
+		</test_usb>
+		<test_rtc comment="测试RTC界面" callback="yes" style="STYLE_SHORTCUT">
+			<content_schinese L1="" L2="                确认" L3="按下SCAN键测试RTC"/>
+			<jump KEY_ENTER="test_AD"/>
+		</test_rtc>
+		<test_AD comment="测试AD采样电路界面" callback="yes" style="STYLE_SHORTCUT">
+			<content_schinese L1="" L2="                确认" L3="按下SCAN键测试AD采样"/>
+			<jump KEY_ENTER="test_bluetooth"/>
+		</test_AD>
+		<test_bluetooth comment="蓝牙模块测试" callback="yes" style="STYLE_SHORTCUT">
+			<content_schinese L1=" " L2="                确认" L3="按下SCAN键测试蓝牙" L4="   "/>
+			<jump KEY_ENTER="test_complete"/>
+		</test_bluetooth>
+		<test_complete comment="测试完成" style="STYLE_SHORTCUT" callback="yes">
+			<content_schinese L1="" L2="                确认" L3=" 此阶段测试已经完成"/>
+			<jump KEY_ENTER="test_menu" KEY_ESC="test_menu"/>
+		</test_complete>
+		<todo comment="待实现界面" style="STYLE_ICON | STYLE_SHORTCUT">
+			<content_english L1="Todo" L2="Esc"/>
+			<content_schinese L1="待实现 " L2="返回"/>
+			<jump KEY_ENTER="logo"/>
+		</todo>
+	</DIALOG>
+</NETCOM>

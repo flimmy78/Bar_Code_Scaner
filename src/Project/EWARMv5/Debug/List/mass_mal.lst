@@ -1,0 +1,377 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     06/Jan/2014  10:04:28 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\usb_lib\mass_mal.c                     #
+#    Command line =  D:\work\T6\FW\src\usb_lib\mass_mal.c -lcN                #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\mass_mal.ls #
+#                    t                                                        #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\mass_mal.o   #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\usb_lib\mass_mal.c
+      1          /******************** (C) COPYRIGHT 2010 STMicroelectronics ********************
+      2          * File Name          : mass_mal.c
+      3          * Author             : MCD Application Team
+      4          * Version            : V3.1.1
+      5          * Date               : 04/07/2010
+      6          * Description        : Medium Access Layer interface
+      7          ********************************************************************************
+      8          * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+      9          * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+     10          * AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+     11          * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+     12          * CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+     13          * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+     14          *******************************************************************************/
+     15          
+     16          /* Includes ------------------------------------------------------------------*/
+     17          #include "mass_mal.h"
+     18          //#include "spi_sd.h"
+     19          #include "stm32f10x_sdio.h"
+     20          #include "PCUsart.h"
+     21          #include "spi_flash.h"
+     22          
+     23          #define DUMMY_FAT_FS		//如果需要开启虚拟文件系统，需要打开此宏
+     24          
+     25          #ifdef DUMMY_FAT_FS
+     26          #include "dummy_fat16_data.h"
+     27          #include <string.h>
+     28          #endif
+     29          
+     30          /* Private typedef -----------------------------------------------------------*/
+     31          /* Private define ------------------------------------------------------------*/
+     32          /* Private macro -------------------------------------------------------------*/
+     33          /* Private variables ---------------------------------------------------------*/
+     34          u32 Mass_Memory_Size[2];
+     35          u32 Mass_Block_Size[2];
+     36          u32 Mass_Block_Count[2];
+     37          volatile u32 Status = 0;
+     38          
+     39          
+     40          //extern SD_CardInfo							SDIO_Info;
+     41          
+     42          /* Private function prototypes -----------------------------------------------*/
+     43          /* Private functions ---------------------------------------------------------*/
+     44          /*******************************************************************************
+     45          * Function Name  : MAL_Init
+     46          * Description    : Initializes the Media on the STM32
+     47          * Input          : None
+     48          * Output         : None
+     49          * Return         : None
+     50          *******************************************************************************/
+     51          u16 MAL_Init(u8 lun)
+     52          {
+     53            u16 status = MAL_OK;
+     54          
+     55            switch (lun)
+     56            {
+     57              case 0:
+     58          //      if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_MSD)
+     59          //      {
+     60          //              Status = SD_Init();
+     61          //      Status = SD_GetCardInfo(&SDCardInfo);
+     62          //      Status = SD_SelectDeselect((u32) (SDCardInfo.RCA << 16));
+     63          //      Status = SD_EnableWideBusOperation(SDIO_BusWide_4b);
+     64           //     Status = SD_SetDeviceMode(SD_DMA_MODE);
+     65          
+     66                //SPI_SD_Init();
+     67           //     }
+     68          
+     69                break;
+     70              default:
+     71                return MAL_FAIL;
+     72            }
+     73            return status;
+     74          }
+     75          /*******************************************************************************
+     76          * Function Name  : MAL_Write
+     77          * Description    : Write sectors
+     78          * Input          : None
+     79          * Output         : None
+     80          * Return         : None
+     81          *******************************************************************************/
+     82          u16 MAL_Write(u8 lun, u32 Memory_Offset, u32 *Writebuff, u16 Transfer_Length)
+     83          {
+     84             unsigned char *pBuf = (unsigned char*)Writebuff;
+     85          #ifdef DUMMY_FAT_FS
+     86          	int i;
+     87          #endif
+     88            switch (lun)
+     89            {
+     90              case 0:
+     91          		if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_DUMMY_FAT)
+     92          		{
+     93          			#ifdef DUMMY_FAT_FS
+     94          				if ((Memory_Offset >= DB_FILE_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (DB_FILE_LBA*Mass_Block_Size[lun]+IF_FILE_SIZE)))
+     95          				{
+     96          					//写接口文件
+     97          					//通过如下方法将接收到的命令数据送往命令缓冲区
+     98          					for (i = 0; i < Transfer_Length;i++)
+     99          					{
+    100          						if(PCUsart_InByte(pBuf[i]))
+    101          						{
+    102          							break;
+    103          						}
+    104          					}
+    105          				}
+    106          
+    107          				break;
+    108          			#endif
+    109          		}
+    110          		else if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_SPI_FLASH)
+    111          		{
+    112          			Status = spi_flash_write(Memory_Offset/512,pBuf,1);
+    113          			if (Status)
+    114          			{
+    115          				return MAL_FAIL;
+    116          			}
+    117          			break;
+    118          		}
+    119          		//else
+    120          		//{
+    121          		//	Status = SD_WriteBlock(Memory_Offset, Writebuff, Transfer_Length);
+    122          		//	if ( Status != SD_OK )
+    123          		//	{
+    124          		//		return MAL_FAIL;
+    125          		//	}      
+    126          		//	//SPI_SD_WriteBlock((u8*)Writebuff, Memory_Offset, Transfer_Length);
+    127          		//	break;
+    128          		//}
+    129              default:
+    130                return MAL_FAIL;
+    131            }
+    132            return MAL_OK;
+    133          }
+    134          
+    135          /*******************************************************************************
+    136          * Function Name  : MAL_Read
+    137          * Description    : Read sectors
+    138          * Input          : None
+    139          * Output         : None
+    140          * Return         : Buffer pointer
+    141          *******************************************************************************/
+    142          u16 MAL_Read(u8 lun, u32 Memory_Offset, u32 *Readbuff, u16 Transfer_Length)
+    143          {
+    144            switch (lun)
+    145            {
+    146              case 0:
+    147          		if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_DUMMY_FAT)
+    148          		{
+    149          			#ifdef DUMMY_FAT_FS
+    150          				if (Memory_Offset < (MBR_LBA*Mass_Block_Size[lun]+512))
+    151          				{
+    152          					memcpy(Readbuff,dummy_MBR+Memory_Offset-MBR_LBA*Mass_Block_Size[lun],Transfer_Length);
+    153          				}
+    154          				else if ((Memory_Offset >= DBR_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (DBR_LBA*Mass_Block_Size[lun]+512)))
+    155          				{
+    156          					memcpy(Readbuff,dummy_DBR+Memory_Offset-DBR_LBA*Mass_Block_Size[lun],Transfer_Length);
+    157          				}
+    158          				else if ((Memory_Offset >= FAT1_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (FAT1_LBA*Mass_Block_Size[lun]+512)))
+    159          				{
+    160          					memcpy(Readbuff,dummy_FAT+Memory_Offset-FAT1_LBA*Mass_Block_Size[lun],Transfer_Length);
+    161          				}
+    162          				else if ((Memory_Offset >= FAT2_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (FAT2_LBA*Mass_Block_Size[lun]+512)))
+    163          				{
+    164          					memcpy(Readbuff,dummy_FAT+Memory_Offset-FAT2_LBA*Mass_Block_Size[lun],Transfer_Length);
+    165          				}
+    166          				else if ((Memory_Offset >= FDT_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (FDT_LBA*Mass_Block_Size[lun]+512)))
+    167          				{
+    168          					memcpy(Readbuff,dummy_FDT+Memory_Offset-FDT_LBA*Mass_Block_Size[lun],Transfer_Length);
+    169          				}
+    170          				else if ((Memory_Offset >= DB_FILE_LBA*Mass_Block_Size[lun])&&(Memory_Offset < (DB_FILE_LBA*Mass_Block_Size[lun]+IF_FILE_SIZE)))
+    171          				{
+    172          					memcpy(Readbuff,g_send_buff + Memory_Offset-DB_FILE_LBA*Mass_Block_Size[lun],Transfer_Length);
+    173          				}
+    174          				else
+    175          				{
+    176          					memset(Readbuff,0,Transfer_Length);
+    177          				}
+    178          				break;
+    179          			#endif
+    180          		}
+    181          		else if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_SPI_FLASH)
+    182          		{
+    183          			Status = spi_flash_post_write();
+    184          			if (Status)
+    185          			{
+    186          				return MAL_FAIL;
+    187          			}
+    188          
+    189          			spi_flash_raddr(Memory_Offset, Transfer_Length,(unsigned char*)Readbuff);
+    190                      break;
+    191          		}
+    192          		//else
+    193          		//{
+    194          		//	Status = SD_ReadBlock(Memory_Offset, Readbuff, Transfer_Length);
+    195          		//	if ( Status != SD_OK )
+    196          		//	{
+    197          		//		return MAL_FAIL;
+    198          		//	}
+    199          		//	//SPI_SD_ReadBlock((u8*)Readbuff, Memory_Offset, Transfer_Length);
+    200          		//	break;
+    201          		//}
+    202              default:
+    203                return MAL_FAIL;
+    204            }
+    205            return MAL_OK;
+    206          }
+    207          
+    208          /*******************************************************************************
+    209          * Function Name  : MAL_GetStatus
+    210          * Description    : Get status
+    211          * Input          : None
+    212          * Output         : None
+    213          * Return         : None
+    214          *******************************************************************************/
+    215          u16 MAL_GetStatus (u8 lun)
+    216          {
+    217          
+    218          #if 1
+    219            u32 DeviceSizeMul = 0, NumberOfBlocks = 0;
+    220          
+    221            u32 temp_block_mul = 0;
+    222          //  SD_CSD MSD_csd;
+    223            //u32 DeviceSizeMul = 0;
+    224          
+    225          
+    226          
+    227            if (lun == 0)
+    228            {
+    229          	  if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_DUMMY_FAT)
+    230          	  {
+    231          		#ifdef DUMMY_FAT_FS  
+    232          		  Mass_Block_Count[0] = 0x1e500;	//dummy
+    233          		  Mass_Block_Size[0] = 512;			//dummy
+    234          		  Mass_Memory_Size[0] = Mass_Block_Count[0] * Mass_Block_Size[0];
+    235          		  return MAL_OK;
+    236          		#endif
+    237          	  }
+    238          	  else if (g_mass_storage_device_type == MASSTORAGE_DEVICE_TYPE_SPI_FLASH)
+    239          	  {
+    240          			Mass_Block_Count[0] = get_spi_flash_capacity();
+    241          			Mass_Block_Size[0] = 512;
+    242          			Mass_Memory_Size[0] = Mass_Block_Count[0] * Mass_Block_Size[0];
+    243          			if (spi_flash_post_write())
+    244          			{
+    245          				return MAL_FAIL;
+    246          			}
+    247          			return MAL_OK;
+    248          	  }
+    249          //	  else
+    250          //	  {
+    251          //		  if (SD_Init() == SD_OK)
+    252          //		  {
+    253          //			  SD_GetCardInfo(&SDCardInfo);
+    254          //			  SD_SelectDeselect((u32) (SDCardInfo.RCA << 16));
+    255          //			  DeviceSizeMul = (SDCardInfo.SD_csd.DeviceSizeMul + 2);
+    256          //
+    257          //			  if(SDCardInfo.CardType == SDIO_HIGH_CAPACITY_SD_CARD)
+    258          //			  {
+    259          //				  Mass_Block_Count[0] = (SDCardInfo.SD_csd.DeviceSize + 1) * 1024;
+    260          //			  }
+    261          //			  else
+    262          //			  {
+    263          //				  NumberOfBlocks  = ((1 << (SDCardInfo.SD_csd.RdBlockLen)) / 512);
+    264          //				  Mass_Block_Count[0] = ((SDCardInfo.SD_csd.DeviceSize + 1) * (1 << DeviceSizeMul) << (NumberOfBlocks/2));
+    265          //			  }
+    266          //			  Mass_Block_Size[0]  = 512;
+    267          //
+    268          //			  Status = SD_SelectDeselect((u32) (SDCardInfo.RCA << 16)); 
+    269          //			  Status = SD_EnableWideBusOperation(SDIO_BusWide_4b); 
+    270          //			  if ( Status != SD_OK )
+    271          //			  {
+    272          //				  return MAL_FAIL;
+    273          //			  }
+    274          //
+    275          //			  Status = SD_SetDeviceMode(SD_DMA_MODE);         
+    276          //			  if ( Status != SD_OK )
+    277          //			  {
+    278          //				  return MAL_FAIL;
+    279          //			  }  
+    280          //			   return MAL_OK;
+    281          //		  }
+    282          #if 0
+    283          			  SPI_SD_GetCSDRegister(&MSD_csd);
+    284          			  DeviceSizeMul = MSD_csd.DeviceSizeMul + 2;
+    285          			  temp_block_mul = (1 << MSD_csd.RdBlockLen)/ 512;
+    286          			  Mass_Block_Count[0] = ((MSD_csd.DeviceSize + 1) * (1 << (DeviceSizeMul))) * temp_block_mul;
+    287          			  Mass_Block_Size[0] = 512;
+    288          			  //Mass_Memory_Size[0] = (Mass_Block_Count[0] * Mass_Block_Size[0]);
+    289          
+    290          			  Mass_Memory_Size[0] = Mass_Block_Count[0] * Mass_Block_Size[0];
+    291          			  return MAL_OK;
+    292          #endif
+    293          //	  }
+    294          
+    295            }
+    296            return MAL_FAIL;
+    297          #endif
+    298          }
+    299          
+    300          /******************* (C) COPYRIGHT 2010 STMicroelectronics *****END OF FILE****/
+
+   Maximum stack usage in bytes:
+
+     Function      .cstack
+     --------      -------
+     MAL_GetStatus      8
+     MAL_Init           0
+     MAL_Read          16
+     MAL_Write         16
+     memcpy             8
+     memset             8
+
+
+   Section sizes:
+
+     Function/Label   Bytes
+     --------------   -----
+     memcpy             14
+     memset             20
+     Mass_Memory_Size    8
+     Mass_Block_Size     8
+     Mass_Block_Count    8
+     Status              4
+     MAL_Init           18
+     MAL_Write         136
+     MAL_Read          556
+     MAL_GetStatus     128
+     ??DataTable26       4
+     ??DataTable30       4
+     ??DataTable32       4
+
+ 
+  28 bytes in section .bss
+ 884 bytes in section .text
+ 
+ 850 bytes of CODE memory (+ 34 bytes shared)
+  28 bytes of DATA memory
+
+Errors: none
+Warnings: 3

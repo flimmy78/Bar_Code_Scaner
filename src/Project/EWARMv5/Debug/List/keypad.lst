@@ -1,0 +1,767 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     31/Mar/2014  10:27:54 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\Drivers\keypad.c                       #
+#    Command line =  D:\work\T6\FW\src\Drivers\keypad.c -lcN                  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\keypad.lst  #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\keypad.o     #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\Drivers\keypad.c
+      1          /**
+      2          * @file keypad.c
+      3          * @brief 按键及LED驱动程序
+      4          * @note 
+      5          * 
+      6          * @version V0.0.1
+      7          * @author zhongyh
+      8          * @date 2009年8月28日
+      9          * @note
+     10          *      本模块为手持刷卡机按键处理模块
+     11          *      本项目为4x6矩阵键盘，有24个按键：
+     12          *    F1     F2    F3    F4
+     13          *    POWER  PgUp  PgDn  InPaper
+     14          *    '1'    '2'   '3'   Menu
+     15          *    '4'    '5'   '6'   Fun
+     16          *    '7'    '8'   '9'   Alpha
+     17          *    Esc    '0'   Clr   Enter
+     18          *    
+     19          *    由上至下，由左而右的键值顺序为：0,1,2,3,4,5...23
+     20          *
+     21          * @copy
+     22          *
+     23          * 此代码为深圳江波龙电子有限公司项目代码，任何人及公司未经许可不得复制传播，或用于
+     24          * 本公司以外的项目。本司保留一切追究权利。
+     25          *
+     26          * <h1><center>&copy; COPYRIGHT 2009 netcom</center></h1>
+     27          *
+     28          */
+     29          #include "stm32f10x_lib.h"
+     30          #include "ucos_ii.h"
+     31          #include <stdio.h>
+     32          #include "keypad.h"
+     33          #include "cpu.h"
+     34          
+     35          //static unsigned int led_state;
+     36          
+     37          static void keypad_initport(void);
+     38          static void Keypad_ScanLine(INT8U line);
+     39          //static int key_readcol(void);
+     40          static void BeepDelay(unsigned int delay);
+     41          /**
+     42          * @brief 键值表
+     43          */
+     44          #if 0
+     45          const unsigned char KeyTable[] = 
+     46          {
+     47          	KEY_FUN1, KEY_FUN2, KEY_FUN3, KEY_FUN4,		// F1,F2,F3,F4
+     48          	KEY_POWER, KEY_UP, KEY_DOWN, KEY_INPAGE,	//PWR,PU,PD,InPaper
+     49          	
+     50          	KEY_NUM1, KEY_NUM2,KEY_NUM3,KEY_MENU,		// 1, 2, 3, Menu
+     51          	KEY_NUM4,KEY_NUM5,KEY_NUM6,KEY_FUN,			// 4, 5, 6, Fun
+     52          	KEY_NUM7,KEY_NUM8,KEY_NUM9,KEY_ALPHA,		// 7, 8, 9, Alpha
+     53          	KEY_ESC,KEY_NUM0,KEY_CLEAR,KEY_ENTER,		// ESC, 0, CLEAR, Enter
+     54          /*	
+     55          	24,25,26,27,	// 扩展按键(非程序使用)
+     56          	28,29,30,31,
+     57          	
+     58          	32,33,34,35,	// PN532事件
+     59          	36,37,38,39,
+     60          	
+     61          	40,41,42,43,	// GPRS事件
+     62          	44,45,46,47,
+     63          	
+     64          	48,49,50,51,	// 2.4G事件
+     65          	52,53,54,55,
+     66          	//	56,57,58,59,
+     67          */		
+     68          };
+     69          #endif
+     70          const unsigned char KeyTable[] = 
+     71          {
+     72          	KEY_ESC, KEY_SCAN, KEY_LEFT_SHOTCUT, 
+     73          	KEY_ENTER, KEY_RIGHT_SHOTCUT, KEY_UP,
+     74          	KEY_LEFT, KEY_RIGHT,KEY_DOWN,KEY_POWER,
+     75          };
+     76          
+     77          /**
+     78          *	@brief 键值与ascii码对应表
+     79          */
+     80          TkeyValue_Ascii keyValue_Ascii_Tbl[] = {
+     81          	{KEY_NUM1,"1"},{KEY_NUM2,"2"},{KEY_A,"A"},{KEY_B,"B"},{KEY_C,"C"},{KEY_a,"a"},{KEY_b,"b"},{KEY_c,"c"},
+     82          	{KEY_NUM3,"3"},{KEY_D,"D"},{KEY_E,"E"},{KEY_F,"F"},{KEY_d,"d"},{KEY_e,"e"},{KEY_f,"f"},{KEY_NUM4,"4"},
+     83          	{KEY_G,"G"},{KEY_H,"H"},{KEY_I,"I"},{KEY_g,"g"},{KEY_h,"h"},{KEY_i,"i"},{KEY_NUM5,"5"},{KEY_J,"J"},
+     84          	{KEY_K,"K"},{KEY_L,"L"},{KEY_j,"j"},{KEY_k,"k"},{KEY_l,"l"},{KEY_NUM6,"6"},{KEY_M,"M"},{KEY_N,"N"},
+     85          	{KEY_O,"O"},{KEY_m,"m"},{KEY_n,"n"},{KEY_o,"o"},{KEY_NUM7,"7"},{KEY_P,"P"},{KEY_Q,"Q"},{KEY_R,"R"},
+     86          	{KEY_S,"S"},{KEY_p,"p"},{KEY_q,"q"},{KEY_r,"r"},{KEY_s,"s"},{KEY_NUM8,"8"},{KEY_T,"T"},{KEY_U,"U"},{KEY_V,"V"},
+     87          	{KEY_t,"t"},{KEY_u,"u"},{KEY_v,"v"},{KEY_NUM9,"9"},{KEY_W,"W"},{KEY_X,"X"},{KEY_Y,"Y"},{KEY_Z,"Z"},
+     88          	{KEY_w,"w"},{KEY_x,"x"},{KEY_y,"y"},{KEY_z,"z"},{KEY_NUM0,"0"},{KEY_space," "},{KEY_douhao,","},{KEY_juhao,"."},{KEY_fenhao,";"},
+     89          	{KEY_xing,"*"},{KEY_jing,"#"},{KEY_lianjiehao,"_"},{KEY_zhonghuaxian,"-"},{KEY_zuo_kuohao,"("},{KEY_you_kuohao,")"},
+     90          
+     91                  {KEY_gantanhao,"!"},{KEY_shuangyinhao,"\x22"},{KEY_meiyuanhao,"$"},{KEY_baifenhao,"%"},{KEY_yuhao,"&"},{KEY_danyinhao,"'"},
+     92          	{KEY_jiahao,"+"},{KEY_chuhao,"/"},{KEY_maohao,":"},{KEY_xiaoyuhao,"<"},{KEY_dengyuhao,"="},{KEY_dayuhao,">"},{KEY_wenhao,"?"},
+     93          	{KEY_athao,"@"},{KEY_zuozhongkuohao,"["},{KEY_xiehuaxianhao,"\\"},{KEY_youzhongkuohao,"]"},{KEY_xorhao,"^"},{KEY_piehao,"`"},
+     94          	{KEY_zuodakuohao,"{"},{KEY_huohao,"|"},{KEY_youdakuohao,"}"},{KEY_qufanhao,"~"},
+     95          	{KEY_FUN1, "F1"}, {KEY_FUN2, "F2"}, {KEY_FUN3, "F3"},{KEY_FUN4, "F4"}, {KEY_UP, "Up"}, {KEY_CLEAR, "Clear"},
+     96          	{KEY_ESC, "Cancel"}, {KEY_DOWN, "Down"},{KEY_LEFT, "Left"},{KEY_RIGHT, "Right"}, {KEY_ENTER, "Enter"},{KEY_POWER,"Power"},{0,0}
+     97          };
+     98          /**
+     99          * @brief   		Intialize the KeyBoard IO
+    100          * @param[in]   none
+    101          * @return      none
+    102          * @note   
+    103          *		键盘矩阵的硬件连接如下图所示：
+    104          *							Col1		Col2		Col3
+    105          *							(PD11)		(PD3)		(PD12)
+    106          *									
+    107          *		Line1(PC6)			F2			KEY_ENTER	   F1
+    108          *							
+    109          *		Line2(PC7)		    F3	        F4          KEY_UP
+    110          *
+    111          *		Line3(PD15)		    KEY_LEFT    KEY_RIGHT   KEY_DOWN
+    112          */
+    113          
+    114          /**
+    115          * @brief 将键值转换为ascii值
+    116          * @param[in] unsigned char key 内部扫描键值
+    117          * @return unsigned char * ascii键值的指针
+    118          */
+    119          unsigned char *key2ascii(unsigned char key)
+    120          {
+    121          	unsigned int i = 0;
+    122          
+    123          	if(key == 0)
+    124          		return 0;
+    125          
+    126          	while (keyValue_Ascii_Tbl[i].asciivalue != 0) 
+    127          	{
+    128          		if (key == keyValue_Ascii_Tbl[i].keyvalue) 
+    129          		{
+    130          			return keyValue_Ascii_Tbl[i].asciivalue;
+    131          		}
+    132          		i++;
+    133          	}
+    134          	return 0;
+    135          }
+    136          
+    137          static void keypad_initport(void)
+    138          {
+    139          	GPIO_InitTypeDef  gpio_init;
+    140          	EXTI_InitTypeDef EXTI_InitStructure;
+    141              // NVIC_InitTypeDef	NVIC_InitStructure;
+    142          	
+    143          	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOD |RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOE | RCC_APB2Periph_AFIO, ENABLE);
+    144                  
+    145          	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC | RCC_APB2Periph_AFIO, ENABLE);
+    146          
+    147          	//POWER-ON  PA.1
+    148          	gpio_init.GPIO_Pin   = POWER_ON;
+    149          	gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
+    150          	gpio_init.GPIO_Mode  = GPIO_Mode_Out_PP;
+    151          	GPIO_Init(GPIOA, &gpio_init);
+    152          	//GPIO_ResetBits(GPIOA,POWER_ON);		
+    153          
+    154          
+    155          	//START  PC.3
+    156          	gpio_init.GPIO_Pin   = START;
+    157          	gpio_init.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+    158          	gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
+    159          	GPIO_Init(GPIOC, &gpio_init);
+    160          	
+    161          	//BEEP CS  PD.3
+    162          #ifdef HW_V1_01
+    163          	gpio_init.GPIO_Pin   = Beep_CS;
+    164          	gpio_init.GPIO_Mode  = GPIO_Mode_Out_PP;
+    165          	GPIO_Init(GPIOD, &gpio_init);
+    166          	GPIO_ResetBits(GPIOD,Beep_CS);	
+    167          #endif
+    168          	//LED_G PD.1
+    169          	gpio_init.GPIO_Pin	= GPIO_Pin_1;
+    170          	gpio_init.GPIO_Mode = GPIO_Mode_Out_PP;
+    171          	GPIO_Init(GPIOD, &gpio_init);
+    172          	GPIO_ResetBits(GPIOD,GPIO_Pin_1);
+    173          	//led_state = 0;
+    174          	
+    175          	///列线置为输入模式，如果外面没有接上拉电阻，需要置为输入上拉模式
+    176          	//PD11 PD3 PD12		V1.0
+    177          #ifdef HW_V1_00
+    178          	gpio_init.GPIO_Pin   =  GPIO_Pin_3 | GPIO_Pin_11 | GPIO_Pin_12;
+    179          #else
+    180          	//PD11 PD4 PD12		V1.01
+    181          	gpio_init.GPIO_Pin   =  GPIO_Pin_4 | GPIO_Pin_11 | GPIO_Pin_12;
+    182          #endif
+    183          
+    184          	gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
+    185          	gpio_init.GPIO_Mode  = GPIO_Mode_IPU;
+    186          	GPIO_Init(GPIOD, &gpio_init);
+    187          
+    188          	///* Connect EXTI Line4 to PA.4 */
+    189          	//GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource4);
+    190          
+    191          	//EXTI_ClearITPendingBit(EXTI_Line4);
+    192          	//EXTI_InitStructure.EXTI_Line = EXTI_Line4;
+    193          	//EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    194          	//EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+    195          	//EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    196          	//EXTI_Init(&EXTI_InitStructure); 
+    197          	//EXTI_GenerateSWInterrupt(EXTI_Line4);
+    198          	
+    199          	
+    200          #ifdef HW_V1_00
+    201          	/* Connect EXTI Line3 to PD.3 */
+    202          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource3);
+    203          	/* Connect EXTI Line11 to PD.11 */
+    204          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource11);
+    205          	/* Connect EXTI Line11 to PD.12 */
+    206          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource12);
+    207          
+    208          	/* Configure EXTI LineX to generate an interrupt on falling edge */
+    209          	EXTI_ClearITPendingBit(EXTI_Line3| EXTI_Line11 | EXTI_Line12);
+    210          	EXTI_InitStructure.EXTI_Line = EXTI_Line3 | EXTI_Line11 | EXTI_Line12;
+    211          	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    212          	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+    213          	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    214          	EXTI_Init(&EXTI_InitStructure);
+    215          	EXTI_GenerateSWInterrupt(EXTI_Line3 | EXTI_Line11 | EXTI_Line12);
+    216          #else
+    217          	/* Connect EXTI Line3 to PC.3 */
+    218          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource3);
+    219          
+    220          	EXTI_ClearITPendingBit(EXTI_Line3);
+    221          	EXTI_InitStructure.EXTI_Line = EXTI_Line3;
+    222          	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    223          	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+    224          	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    225          	EXTI_Init(&EXTI_InitStructure); 
+    226          	EXTI_GenerateSWInterrupt(EXTI_Line3);
+    227          
+    228          	/* Connect EXTI Line4 to PD.4 */
+    229          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource4);
+    230          	/* Connect EXTI Line11 to PD.11 */
+    231          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource11);
+    232          	/* Connect EXTI Line11 to PD.12 */
+    233          	GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource12);
+    234          
+    235          	/* Configure EXTI LineX to generate an interrupt on falling edge */
+    236          	EXTI_ClearITPendingBit(EXTI_Line4| EXTI_Line11 | EXTI_Line12);
+    237          	EXTI_InitStructure.EXTI_Line = EXTI_Line4 | EXTI_Line11 | EXTI_Line12;
+    238          	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    239          	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    240          	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    241          	EXTI_Init(&EXTI_InitStructure);
+    242          	EXTI_GenerateSWInterrupt(EXTI_Line4 | EXTI_Line11 | EXTI_Line12);
+    243          #endif
+    244          
+    245          
+    246          
+    247          	
+    248          	///行线置为输出模式（PD.15）
+    249          	gpio_init.GPIO_Pin   = GPIO_Pin_15;
+    250          	gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
+    251          	gpio_init.GPIO_Mode  = GPIO_Mode_Out_PP;
+    252          	GPIO_Init(GPIOD, &gpio_init);	
+    253          
+    254          	///PC.6, PC.7
+    255          	gpio_init.GPIO_Pin   = GPIO_Pin_6 | GPIO_Pin_7;
+    256          	gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
+    257          	gpio_init.GPIO_Mode  = GPIO_Mode_Out_PP;
+    258          	GPIO_Init(GPIOC, &gpio_init);
+    259          
+    260          	///每一根行线都输出低电平
+    261          	Keypad_ScanLine(0);
+    262          }
+    263          
+    264          /**
+    265          * @brief   	Scan key pad lines
+    266          * @param[in]   none
+    267          * @return      none
+    268          */
+    269          void Keypad_Int_Enable(void)
+    270          {
+    271          	NVIC_InitTypeDef	NVIC_InitStructure;
+    272          #ifdef HW_V1_00
+    273          	EXTI_ClearITPendingBit(EXTI_Line3);
+    274          #else
+    275          	EXTI_ClearITPendingBit(EXTI_Line3);
+    276          	EXTI_ClearITPendingBit(EXTI_Line4);
+    277          #endif
+    278          	EXTI_ClearITPendingBit(EXTI_Line11);
+    279          	EXTI_ClearITPendingBit(EXTI_Line12);
+    280          	
+    281          
+    282          	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);    // 抢占式优先级别
+    283          #ifdef HW_V1_00
+    284          	NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQChannel;
+    285          #else
+    286          	NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQChannel;
+    287          	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    288          	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    289          	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    290          	NVIC_Init(&NVIC_InitStructure);
+    291          
+    292          	NVIC_InitStructure.NVIC_IRQChannel = EXTI4_IRQChannel;
+    293          #endif
+    294          	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    295          	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    296          	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    297          	NVIC_Init(&NVIC_InitStructure);
+    298          
+    299          
+    300          	NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQChannel;
+    301              NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    302          	NVIC_Init(&NVIC_InitStructure);
+    303          }
+    304          /**
+    305          * @brief   	Scan key pad lines
+    306          * @param[in]   none
+    307          * @return      none
+    308          */
+    309          static void Keypad_ScanLine(INT8U line)
+    310          {
+    311          	switch(line)
+    312          	{
+    313          	case 0:     //pull low  every line
+    314          		GPIO_ResetBits(GPIOD,GPIO_Pin_15);
+    315          		GPIO_ResetBits(GPIOC,GPIO_Pin_6 | GPIO_Pin_7);
+    316          		break;
+    317          	case 1:
+    318          		GPIO_ResetBits(GPIOC,GPIO_Pin_6);
+    319          		GPIO_SetBits(GPIOC,GPIO_Pin_7);
+    320          		GPIO_SetBits(GPIOD,GPIO_Pin_15);
+    321          		break;
+    322          	case  2:
+    323          		GPIO_ResetBits(GPIOC,GPIO_Pin_7);
+    324          		GPIO_SetBits(GPIOC,GPIO_Pin_6);
+    325          		GPIO_SetBits(GPIOD,GPIO_Pin_15);
+    326          		break;
+    327          	case  3:
+    328          		GPIO_ResetBits(GPIOD,GPIO_Pin_15);
+    329          		GPIO_SetBits(GPIOC,GPIO_Pin_6 | GPIO_Pin_12);
+    330          		break;
+    331          	default:
+    332          		break;    
+    333          	}
+    334          }
+    335          
+    336          
+    337          /**
+    338          * @brief 读取键盘列值
+    339          */
+    340          int key_readcol(void)
+    341          {
+    342          	int			value = 0;
+    343          	
+    344          	if(GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_12))
+    345          		value	|= 0x04; 
+    346          #ifdef HW_V1_00
+    347          	if(GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_3))
+    348          #else
+    349          	if(GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_4))
+    350          #endif
+    351          		value	|= 0x02;
+    352          	if(GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_11))
+    353          		value	|= 0x01;
+    354          
+    355          	return value;
+    356          }
+    357          
+    358          
+    359          
+    360          
+    361          //void led_r_ctrl(int on)
+    362          //{
+    363          //	if(on)
+    364          //	{
+    365          //		if (led_state & 0x10)
+    366          //		{
+    367          //			GPIO_SetBits(GPIOD, GPIO_Pin_1);	//先关闭蓝灯
+    368          //		}
+    369          //		GPIO_ResetBits(GPIOD, GPIO_Pin_0);
+    370          //		led_state |= 0x01;
+    371          //	}
+    372          //	else
+    373          //	{
+    374          //		if (led_state & 0x10)
+    375          //		{
+    376          //			GPIO_ResetBits(GPIOD, GPIO_Pin_1);	//再打开蓝灯
+    377          //		}
+    378          //		GPIO_SetBits(GPIOD, GPIO_Pin_0);
+    379          //		led_state &= ~0x01;
+    380          //	}
+    381          //}
+    382          
+    383          void led_g_ctrl(int on)
+    384          {
+    385          	if(on)
+    386          	{
+    387          		//if (led_state & 0x01)
+    388          		//{
+    389          		//	GPIO_SetBits(GPIOD, GPIO_Pin_0);	//先关闭红灯
+    390          		//}
+    391          		GPIO_SetBits(GPIOD, GPIO_Pin_1);
+    392          		//led_state |= 0x10;
+    393          	}
+    394          	else
+    395          	{
+    396          		//if (led_state & 0x01)
+    397          		//{
+    398          		//	GPIO_ResetBits(GPIOD, GPIO_Pin_0);	//再打开红灯
+    399          		//}
+    400          		GPIO_ResetBits(GPIOD, GPIO_Pin_1);
+    401          		//led_state &= ~0x10;
+    402          	}
+    403          }
+    404          
+    405          /**
+    406          * @brief 初始化按键
+    407          */
+    408          void keypad_init(void)
+    409          {
+    410          	keypad_initport();
+    411          	Keypad_ScanLine(1);
+    412          	Keypad_ScanLine(2);
+    413          	Keypad_ScanLine(3);
+    414          	Keypad_ScanLine(0);
+    415          }
+    416          
+    417          
+    418          /**
+    419          * @brief 读取键盘值
+    420          */
+    421          unsigned char *keypad_getkey(void)
+    422          {
+    423          	int i, value, value_new,n;
+    424          
+    425          	if(POWER_KEY_PRESSED)
+    426          	{
+    427          		return (unsigned char*)&KeyTable[9];
+    428          	}
+    429                 
+    430          	value = key_readcol();
+    431          	
+    432          	if( value == 0x07)
+    433          		return 0;			// 无按键
+    434          	
+    435          	if(value != 0x03 && value!= 0x05 && value!=0x06)
+    436          		return 0;			// 多列的键被按下
+    437          	
+    438          	for(i=0; i<3; i++)
+    439          	{
+    440          		Keypad_ScanLine(i+1);
+    441          		//OSTimeDly(1);
+    442          		for(n = 0;n < 5000; n++);
+    443          		
+    444          		value_new = key_readcol();
+    445          		if(value == value_new)
+    446          		{
+    447          			Keypad_ScanLine(0);
+    448          			
+    449          			value &= 0x07;
+    450          			
+    451          			if(value == 0x06)
+    452          				return (unsigned char*)&KeyTable[i*3];
+    453          			if(value == 0x05)
+    454          				return (unsigned char*)&KeyTable[1+i*3];
+    455          			if(value == 0x03)
+    456          				return (unsigned char*)&KeyTable[2+i*3];
+    457          			return 0;
+    458          		}
+    459          	}
+    460          	Keypad_ScanLine(0);
+    461          	return 0;
+    462          	
+    463          }
+    464          
+    465          
+    466          
+    467          void keypad_release(void)
+    468          {
+    469          	while( (key_readcol() & 0x07) != 0x07)
+    470          		OSTimeDly(2);
+    471          }
+    472          
+    473          /**
+    474          * @brief 检查按键是否属于退出类型，如"Menu, Enter,Esc, Fun"
+    475          * @return 0:是退出类型
+    476          *        -1:不是退出类型
+    477          */
+    478          int keypad_isexit(int key)
+    479          {
+    480          	if(key == KEY_ESC || key==KEY_ENTER)
+    481          	{
+    482          		return 0;
+    483          	}
+    484          	return -1;
+    485          }
+    486          
+    487          /**
+    488          * @brief 检查按键是否数字键和清除键
+    489          */
+    490          int keypad_isnum(int key)
+    491          {
+    492          	if(key==KEY_NUM1 || key==KEY_NUM2 || key==KEY_NUM3 || 
+    493          		key==KEY_NUM4 || key==KEY_NUM5 || key==KEY_NUM6 || 
+    494          		key==KEY_NUM7 || key==KEY_NUM8 || key==KEY_NUM9 || 
+    495          		key==KEY_NUM0 || key==KEY_CLEAR)
+    496          		return 0;
+    497          	return -1;
+    498          }
+    499          
+    500          /**
+    501          * @brief 开机
+    502          */
+    503          void PowerOn(void)
+    504          {
+    505          	//GPIO_ResetBits(GPIOA,POWER_ON);		//old HW Version
+    506              GPIO_SetBits(GPIOA,POWER_ON);
+    507          	GPIO_SetBits(GPIOA,POWER_ON);
+    508          }
+    509          
+    510          /**
+    511          * @brief 关机
+    512          */
+    513          void PowerOff(void)
+    514          {
+    515              while (1)
+    516              {
+    517          		GPIO_ResetBits(GPIOA,POWER_ON);
+    518              }
+    519          }
+    520          
+    521          /**
+    522          * @brief 开蜂鸣器
+    523          * @param[in]  int cnt   蜂鸣器驱动脉冲的过数
+    524          * @note 延时是纯粹的软件延时，如果参数cnt太小，蜂鸣器会表现为没有声音发出来，建议cnt大于50000
+    525          */
+    526          void Beep(int cnt)
+    527          {
+    528          	CPU_SR         cpu_sr;
+    529          	CPU_CRITICAL_ENTER();
+    530              while(cnt)
+    531              {
+    532          		GPIO_SetBits(GPIOD,Beep_CS);
+    533          		BeepDelay(3000);
+    534          		//GPIO_ResetBits(GPIOD,Beep_CS);
+    535          		//BeepDelay(1600);
+    536          		cnt--;
+    537              }
+    538          	GPIO_ResetBits(GPIOD,Beep_CS);
+    539          	//BeepDelay(1600);
+    540          	CPU_CRITICAL_EXIT();
+    541          }
+    542          
+    543          /**
+    544          * @brief 产生蜂鸣器驱动脉冲的延时函数  2.7KHZ
+    545          * @param[in]  int delay   
+    546          * @note 延时是纯粹的软件延时
+    547          */
+    548          static void BeepDelay(unsigned int delay)
+    549          {
+    550          	do{
+    551          	}while(delay--);
+    552          }
+    553          
+    554          //输入脉冲
+    555          void trip(int cnt)
+    556          {
+    557          	while(cnt--)
+    558          	{
+    559          		GPIO_SetBits(GPIOC,TRIP_PIN);
+    560          		BeepDelay(1);
+    561          		GPIO_ResetBits(GPIOC,TRIP_PIN);
+    562          		BeepDelay(1);
+    563          	}
+    564          }
+
+   Maximum stack usage in bytes:
+
+     Function          .cstack
+     --------          -------
+     Beep                  16
+     BeepDelay              0
+     Keypad_Int_Enable      8
+     Keypad_ScanLine        8
+     PowerOff               8
+     PowerOn                8
+     key2ascii              0
+     key_readcol            8
+     keypad_getkey         16
+     keypad_init            8
+     keypad_initport       16
+     keypad_isexit          0
+     keypad_isnum           0
+     keypad_release         8
+     led_g_ctrl             8
+     trip                   8
+
+
+   Section sizes:
+
+     Function/Label       Bytes
+     --------------       -----
+     KeyTable               12
+     keyValue_Ascii_Tbl    864
+     key2ascii              60
+     keypad_initport       340
+     Keypad_Int_Enable     118
+     Keypad_ScanLine       120
+     key_readcol            60
+     led_g_ctrl             26
+     keypad_init            32
+     keypad_getkey         168
+     keypad_release         24
+     keypad_isexit          18
+     keypad_isnum           54
+     PowerOn                20
+     PowerOff               12
+     Beep                   50
+     BeepDelay              10
+     trip                   44
+     ??DataTable27           4
+     ??DataTable29           4
+     ??DataTable31           4
+     ?<Constant "1">         2
+     ?<Constant "2">         2
+     ?<Constant "A">         2
+     ?<Constant "B">         2
+     ?<Constant "C">         2
+     ?<Constant "a">         2
+     ?<Constant "b">         2
+     ?<Constant "c">         2
+     ?<Constant "3">         2
+     ?<Constant "D">         2
+     ?<Constant "E">         2
+     ?<Constant "F">         2
+     ?<Constant "d">         2
+     ?<Constant "e">         2
+     ?<Constant "f">         2
+     ?<Constant "4">         2
+     ?<Constant "G">         2
+     ?<Constant "H">         2
+     ?<Constant "I">         2
+     ?<Constant "g">         2
+     ?<Constant "h">         2
+     ?<Constant "i">         2
+     ?<Constant "5">         2
+     ?<Constant "J">         2
+     ?<Constant "K">         2
+     ?<Constant "L">         2
+     ?<Constant "j">         2
+     ?<Constant "k">         2
+     ?<Constant "l">         2
+     ?<Constant "6">         2
+     ?<Constant "M">         2
+     ?<Constant "N">         2
+     ?<Constant "O">         2
+     ?<Constant "m">         2
+     ?<Constant "n">         2
+     ?<Constant "o">         2
+     ?<Constant "7">         2
+     ?<Constant "P">         2
+     ?<Constant "Q">         2
+     ?<Constant "R">         2
+     ?<Constant "S">         2
+     ?<Constant "p">         2
+     ?<Constant "q">         2
+     ?<Constant "r">         2
+     ?<Constant "s">         2
+     ?<Constant "8">         2
+     ?<Constant "T">         2
+     ?<Constant "U">         2
+     ?<Constant "V">         2
+     ?<Constant "t">         2
+     ?<Constant "u">         2
+     ?<Constant "v">         2
+     ?<Constant "9">         2
+     ?<Constant "W">         2
+     ?<Constant "X">         2
+     ?<Constant "Y">         2
+     ?<Constant "Z">         2
+     ?<Constant "w">         2
+     ?<Constant "x">         2
+     ?<Constant "y">         2
+     ?<Constant "z">         2
+     ?<Constant "0">         2
+     ?<Constant " ">         2
+     ?<Constant ",">         2
+     ?<Constant ".">         2
+     ?<Constant ";">         2
+     ?<Constant "*">         2
+     ?<Constant "#">         2
+     ?<Constant "_">         2
+     ?<Constant "-">         2
+     ?<Constant "(">         2
+     ?<Constant ")">         2
+     ?<Constant "!">         2
+     ?<Constant "\"">        2
+     ?<Constant "$">         2
+     ?<Constant "%">         2
+     ?<Constant "&">         2
+     ?<Constant "\'">        2
+     ?<Constant "+">         2
+     ?<Constant "/">         2
+     ?<Constant ":">         2
+     ?<Constant "<">         2
+     ?<Constant "=">         2
+     ?<Constant ">">         2
+     ?<Constant "?">         2
+     ?<Constant "@">         2
+     ?<Constant "[">         2
+     ?<Constant "\\">        2
+     ?<Constant "]">         2
+     ?<Constant "^">         2
+     ?<Constant "`">         2
+     ?<Constant "{">         2
+     ?<Constant "|">         2
+     ?<Constant "}">         2
+     ?<Constant "~">         2
+     ?<Constant "F1">        4
+     ?<Constant "F2">        4
+     ?<Constant "F3">        4
+     ?<Constant "F4">        4
+     ?<Constant "Up">        4
+     ?<Constant "Clear">     8
+     ?<Constant "Cancel">    8
+     ?<Constant "Down">      8
+     ?<Constant "Left">      8
+     ?<Constant "Right">     8
+     ?<Constant "Enter">     8
+     ?<Constant "Power">     8
+
+ 
+   864 bytes in section .data
+   278 bytes in section .rodata
+ 1 168 bytes in section .text
+ 
+ 1 168 bytes of CODE  memory
+   278 bytes of CONST memory
+   864 bytes of DATA  memory
+
+Errors: none
+Warnings: none

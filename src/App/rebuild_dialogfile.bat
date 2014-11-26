@@ -1,0 +1,1 @@
+dialog_parse.exe dialog.xml

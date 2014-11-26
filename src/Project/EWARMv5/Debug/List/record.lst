@@ -1,0 +1,4051 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     31/Mar/2014  10:27:51 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\App\record.c                           #
+#    Command line =  D:\work\T6\FW\src\App\record.c -lcN                      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\record.lst  #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\record.o     #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\App\record.c
+      1          /**
+      2           * @file record.c
+      3           * @brief T1Gen项目交易记录管理模块
+      4           * @version 2.0
+      5           * @author joe
+      6           * @date 2011年12月20日
+      7           * @note 利用T卡保存记录
+      8           *
+      9           * @version 1.0
+     10           * @author joe
+     11           * @date 2011年03月30日
+     12           * @note 利用通用的记录管理模块实现的
+     13           * @copy
+     14           *
+     15           * 此代码为深圳江波龙电子有限公司项目代码，任何人及公司未经许可不得复制传播，或用于
+     16           * 本公司以外的项目。本司保留一切追究权利。
+     17           *
+     18           * <h1><center>&copy; COPYRIGHT 2011 netcom</center></h1>
+     19           */
+     20          
+     21          #include "record.h"
+     22          #include "crc32.h"
+     23          #include <string.h>
+     24          #include "data_transfer.h"
+     25          #include "TimeBase.h"
+     26          #include "calendar.h"
+     27          #include "Terminal_Para.h"
+     28          #include "ff.h"
+     29          #include "hash.h"
+     30          #include "res_upgrade.h"	
+     31          #include "JMemory.h"
+     32          
+     33          unsigned char			rec_module_buffer[RECORD_MAX_SIZE];	//记录模块的公用buffer	
+     34          
+     35          
+     36          unsigned int current_node_offset;
+     37          unsigned int g_rec_offset;
+     38          
+     39          static unsigned int	prev_node_offset;
+     40          static unsigned int	next_node_offset;
+     41          
+     42          
+     43          DJ_CONTEXT danju_context;
+     44          
+     45          static unsigned int log_len;
+     46          
+     47          FIL						file2,file3;
+     48          DIR						dir;							//文件夹
+     49          
+     50          
+     51          #ifdef T5_SD_DEBUG
+     52          FIL						debug_file;
+     53          unsigned int			debug_file_status;
+     54          #endif
+     55          
+     56          extern FIL				file1;
+     57          extern FATFS			fs;
+     58          extern TTerminalPara	g_param;
+     59          
+     60          
+     61          /**
+     62          * @brief 初始化哈希表文件
+     63          */
+     64          static int init_hash_table_file(FIL* file)
+     65          {
+     66          	unsigned char	buffer[512];
+     67          	unsigned int	r_w_byte_cnt,i;
+     68          
+     69          	f_lseek(file,0);
+     70          	memset(buffer,0,512);
+     71          	for (i = 0; i< ((HASH_TABLE_SIZE*4)/512);i++)
+     72          	{
+     73          		if (f_write(file,buffer,512,&r_w_byte_cnt) != FR_OK)
+     74          		{
+     75          			return -1;
+     76          		}
+     77          
+     78          		if (r_w_byte_cnt != 512)
+     79          		{
+     80          			return -1;
+     81          		}
+     82          	}
+     83          
+     84          	if (f_truncate(file) != FR_OK)
+     85          	{
+     86          		return -1;
+     87          	}
+     88          
+     89          	f_sync(file);
+     90          
+     91          	return FR_OK;
+     92          }
+     93          
+     94          /**
+     95          * @brief 初始化序列号信息文件
+     96          */
+     97          static int init_data_info_file(FIL* file)
+     98          {
+     99          	unsigned char	buffer[12];
+    100          	unsigned int	r_w_byte_cnt,i;
+    101          
+    102          	f_lseek(file,0);
+    103          	memcpy(buffer,"info",4);
+    104          	memset(buffer+4,0,8);
+    105          	
+    106          
+    107          	if (f_write(file,buffer,12,&r_w_byte_cnt) != FR_OK)
+    108          	{
+    109          		return -1;
+    110          	}
+    111          
+    112          	if (r_w_byte_cnt != 12)
+    113          	{
+    114          		return -1;
+    115          	}
+    116          
+    117          	if (f_truncate(file) != FR_OK)
+    118          	{
+    119          		return -1;
+    120          	}
+    121          
+    122          	f_sync(file);
+    123          
+    124          	return FR_OK;
+    125          }
+    126          
+    127          /**
+    128           * @brief 系统的所有记录模块的初始化
+    129           * @return 0: OK   else: 错误代码
+    130           * @note: 返回值不能很好的定位到具体的错误发生的位置，后续有需要再修改
+    131           */
+    132          int record_module_init(void)
+    133          {
+    134          	const unsigned char *tmp_dir[3];
+    135          	unsigned int		i,j;	
+    136          	unsigned char		dir_str[35];
+    137          	const unsigned char	*p_hash_table_file[3];
+    138          
+    139          	//f_mount(0, &fs);										// 装载文件系统
+    140          
+    141          	if( f_opendir(&dir,rec_file_dirctory) != FR_OK )
+    142          	{
+    143          		//打开记录文件失败或者无法访问SD卡,如果是该文件夹不存在，那么就创建一个新的文件夹
+    144          		if (f_mkdir(rec_file_dirctory) != FR_OK)
+    145          		{
+    146          			//无法访问SD卡
+    147          			return 1;	
+    148          		}
+    149          
+    150          		if( f_opendir(&dir,rec_file_dirctory) != FR_OK )
+    151          		{
+    152          			//刚创建成功了还打不开，那就诡异了（会出现这个错误吗？？？）
+    153          			return 1;
+    154          		}
+    155          	}
+    156          	
+    157          	//到此为止，进入了T5_DB文件夹，检查保存各种记录的相应文件夹是否都存在
+    158          	
+    159          	tmp_dir[0] = goods_list_dirctory;
+    160          	tmp_dir[1] = check_dirctory;
+    161          	tmp_dir[2] = batch_dirctory;
+    162          
+    163          
+    164          	for (i = 0; i < 3;i++)
+    165          	{
+    166          		if( f_opendir(&dir,tmp_dir[i]) != FR_OK )
+    167          		{
+    168          			//如果是该文件夹不存在，那么就创建一个新的文件夹
+    169          			if (f_mkdir(tmp_dir[i]) != FR_OK)
+    170          			{
+    171          				//无法访问SD卡
+    172          				return 1;	
+    173          			}
+    174          		}
+    175          
+    176          		if(i == 0 || i == 1)
+    177          		{
+    178          			//保存盘点信息的文件夹需要建立一个hash表文件
+    179          			p_hash_table_file[0] = barcode_hash_table_file;
+    180          			p_hash_table_file[1] = 0;
+    181          		}
+    182          		else
+    183          		{
+    184          			//保存脱机记录的文件夹需要建立一个INF文件
+    185          			p_hash_table_file[0] = batch_inf_file;
+    186          			p_hash_table_file[1] = 0;
+    187          		}
+    188          
+    189          		j = 0;
+    190          		while (p_hash_table_file[j])
+    191          		{
+    192          			strcpy(dir_str,tmp_dir[i]);
+    193          			strcat(dir_str,p_hash_table_file[j]);
+    194          
+    195          			if (f_open(&file1,(const char*)dir_str,FA_OPEN_ALWAYS | FA_WRITE) != FR_OK)
+    196          			{
+    197          				return 2;
+    198          			}
+    199          
+    200          			if (i == 0 || i == 1)
+    201          			{
+    202          				if (file1.fsize != HASH_TABLE_SIZE*4)
+    203          				{
+    204          					if (init_hash_table_file(&file1) != FR_OK)
+    205          					{
+    206          						return 3;
+    207          					}
+    208          				}
+    209          			}
+    210          
+    211          			if (i == 2)
+    212          			{
+    213          				if ((file1.fsize < 12)||(file1.fsize > 12 + 4*RECORD_MAX_SIZE))
+    214          				{
+    215          					if (init_data_info_file(&file1) != FR_OK)
+    216          					{
+    217          						return 3;
+    218          					}
+    219          				}
+    220          			}
+    221          
+    222          			f_sync(&file1);
+    223          			j++;
+    224          		}
+    225          	}
+    226          	
+    227          	current_node_offset = 0;
+    228          	return 0;
+    229          }
+    230          
+    231          /**
+    232           * @brief 读指定记录，该记录必须存在，此函数中不作判断
+    233           * @param[in] unsigned char rectype	 记录的类型
+    234           * @param[in] int index 记录的索引(最老的记录的索引号是1)
+    235           * @return 返回记录的地址
+    236           */
+    237          unsigned char *record_module_read(unsigned char rectype, unsigned int index)
+    238          {
+    239          	unsigned char	dir_str[35];
+    240          	unsigned int	node_size;
+    241          	unsigned char	*pBuf;
+    242          	unsigned int	checkvalue;
+    243          	int		re_read_cnt = 3;		//如果一次读取失败，那么重读3次
+    244          	int		ret;
+    245          
+    246          	if (index == 0)
+    247          	{
+    248          		return (unsigned char*)0;
+    249          	}
+    250          	
+    251          	pBuf = rec_module_buffer;
+    252          	if (REC_TYPE_GOODS_LIST == rectype)
+    253          	{
+    254          		strcpy(dir_str,goods_list_dirctory);
+    255          		strcat(dir_str,goods_list_file);
+    256          		node_size = sizeof(TGOODS_SPEC_RECORD);
+    257          	}
+    258          	else if (REC_TYPE_CHECK == rectype)
+    259          	{
+    260          		strcpy(dir_str,check_dirctory);
+    261          		strcat(dir_str,check_list_file);
+    262          		node_size = sizeof(TCHECK_INFO_RECORD);
+    263          	}
+    264          	else if (REC_TYPE_BATCH == rectype)
+    265          	{
+    266          		strcpy(dir_str,batch_dirctory);
+    267          		strcat(dir_str,batch_list_file);
+    268          		node_size = sizeof(TBATCH_NODE);
+    269          	}
+    270          	else
+    271          	{
+    272          		return (unsigned char*)0;
+    273          	}
+    274          
+    275          	if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    276          	{
+    277          		return (unsigned char*)0;
+    278          	}
+    279          
+    280          	if (file1.fsize < node_size*index)
+    281          	{
+    282          		f_close(&file1);
+    283          		return (unsigned char*)0;
+    284          	}
+    285          
+    286          	f_lseek(&file1,node_size*(index-1));
+    287          
+    288          	if (f_read(&file1,pBuf,node_size,&node_size) != FR_OK)
+    289          	{
+    290          		f_close(&file1);
+    291          		return (unsigned char*)0;
+    292          	}
+    293          
+    294          	checkvalue = crc32(0,pBuf+4,node_size-4);
+    295          	if (memcmp((unsigned char*)&checkvalue,pBuf,4))
+    296          	{
+    297          		//校验值不对
+    298          		f_close(&file1);
+    299          		return (unsigned char*)0;
+    300          	}
+    301          
+    302          	f_close(&file1);
+    303          	return pBuf;
+    304          }
+    305          
+    306          //计算校验值并填回去
+    307          static calc_check_value(unsigned char rectype,unsigned char *precord)
+    308          {
+    309          	unsigned int		checkvalue;
+    310          
+    311          	//计算此份记录的校验值，放到记录的最前面4个字节
+    312          	if (REC_TYPE_GOODS_LIST == rectype)
+    313          	{
+    314          		checkvalue = crc32(0,precord + 4,sizeof(TGOODS_SPEC_RECORD) - 4);
+    315          	}
+    316          	else if (REC_TYPE_CHECK == rectype )
+    317          	{
+    318          		checkvalue = crc32(0,precord + 4,sizeof(TCHECK_INFO_RECORD) - 4);
+    319          	}
+    320          	else if (REC_TYPE_BATCH == rectype)
+    321          	{
+    322          		checkvalue = crc32(0,precord + 4,sizeof(TBATCH_NODE) - 4);
+    323          	}
+    324          
+    325          	memcpy(precord,(unsigned char*)&checkvalue,4);
+    326          }
+    327          /**
+    328          * @brief 增加一个节点到记录文件之后更新记录文件的链表
+    329          * @param[in] FIL *file						记录文件指针,已经打开的文件
+    330          * @param[in] unsigned char	*p_node			要新增的节点指针
+    331          * @param[in] unsigned char	node_type		节点类型		
+    332          * @param[in] unsigned char	key_type		关键字类型		1:barcode  2:name (序列号节点的属性1) 
+    333          * @param[in] unsigned int	header			链表首地址
+    334          * @param[in] unsigned int	node_offset		要增加节点的偏移
+    335          * @return 0:成功
+    336          *        else:失败
+    337          * @note 只有商品信息节点是双向链表，所以增加节点时需要维护双向链表，其余节点都是单向链表
+    338          */
+    339          static int  update_link_info_after_addNode(FIL *file,unsigned char*p_node, unsigned char node_type,unsigned char key_type,unsigned int header,unsigned int node_offset)
+    340          {
+    341          	unsigned int	rec_size,next_node_offset,current_offset,tmp;
+    342          	unsigned char	buffer[512];		//如果一个节点的大小超过了512，那么还需要增加此临时空间
+    343          
+    344          	if (REC_TYPE_GOODS_LIST == node_type)
+    345          	{
+    346          		rec_size = sizeof(TGOODS_SPEC_RECORD);
+    347          	}
+    348          	else if (REC_TYPE_CHECK == node_type)
+    349          	{
+    350          		rec_size = sizeof(TCHECK_INFO_RECORD);
+    351          	}
+    352          	else if (REC_TYPE_BATCH == node_type)
+    353          	{	
+    354          		rec_size = sizeof(TBATCH_NODE);
+    355          	}
+    356          	else
+    357          	{
+    358          		return -1;
+    359          	}
+    360          
+    361          	next_node_offset = header;
+    362          	while (next_node_offset)
+    363          	{
+    364          		current_offset = next_node_offset;
+    365          		f_lseek(file,(next_node_offset-1)*rec_size);		//文件指针定位到链表首记录的偏移处，注意链表中记录的偏移是该节点结束的偏移
+    366          		if (f_read(file,buffer,rec_size,&tmp) != FR_OK)
+    367          		{
+    368          			return -2;
+    369          		}
+    370          
+    371          		if(key_type != 1)
+    372          		{
+    373          			return -1;
+    374          		}
+    375          
+    376          		if (REC_TYPE_GOODS_LIST == node_type)
+    377          		{
+    378          			//商品节点
+    379          			next_node_offset = ((TGOODS_SPEC_RECORD*)buffer)->by_barcode_next;
+    380          			if (next_node_offset == 0)
+    381          			{
+    382          				((TGOODS_SPEC_RECORD*)buffer)->by_barcode_next = node_offset;		//将链表最后一个节点的next指针指向当前节点
+    383          				((TGOODS_SPEC_RECORD*)p_node)->by_barcode_next = current_offset;	//将当前节点的prev指针指向链表的最后一个节点
+    384          				((TGOODS_SPEC_RECORD*)p_node)->by_barcode_next = 0;					//将当前节点的next指针清0
+    385          			}
+    386          		}
+    387          		else if(REC_TYPE_CHECK == node_type)
+    388          		{
+    389          			//盘点信息节点
+    390          			next_node_offset = ((TCHECK_INFO_RECORD*)buffer)->by_barcode_next;
+    391          			if (next_node_offset == 0)
+    392          			{
+    393          				((TCHECK_INFO_RECORD*)buffer)->by_barcode_next = node_offset;
+    394          				((TCHECK_INFO_RECORD*)p_node)->by_barcode_prev = current_offset;
+    395          				((TCHECK_INFO_RECORD*)p_node)->by_barcode_next = 0;
+    396          			}
+    397          		}
+    398          		else
+    399          		{
+    400          			next_node_offset = ((TBATCH_NODE*)buffer)->by_index_next;
+    401          			if (next_node_offset == 0)
+    402          			{
+    403          				((TBATCH_NODE*)buffer)->by_index_next = node_offset;
+    404          				((TBATCH_NODE*)p_node)->by_index_prev = current_offset;
+    405          				((TBATCH_NODE*)p_node)->by_index_next = 0;
+    406          			}
+    407          		}
+    408          	}
+    409          
+    410          	calc_check_value(node_type,buffer);
+    411          	f_lseek(file,(current_offset-1)*rec_size);		//文件指针重新定位到链表最后一个节点处
+    412          	if (f_write(file,buffer,rec_size,&tmp) != FR_OK)
+    413          	{
+    414          		return -3;
+    415          	}
+    416          
+    417          	if (tmp != rec_size)
+    418          	{
+    419          		return -3;
+    420          	}
+    421          
+    422          	f_sync(file);
+    423          	
+    424          	return 0;
+    425          }
+    426          
+    427          
+    428          //将准备进行的文件操作的相关信息保存到日志文件
+    429          //note : 对于每一种操作来说参数列表中的参数的含义都不相同
+    430          //       op_type == OP_TYPE_ADD_NODE 时,		param1 表示记录类型, param2 表示新增节点的偏移  param3 表示新增节点的长度  param4 指向新增节点数据
+    431          //		 op_type == OP_TYPE_CLEAR_NODE 时,		param1 表示记录类型, param2 无意义					param3 无意义 param4 无意义
+    432          //		 op_type == OP_TYPE_DEL_NODE 时,		param1 表示记录类型, param2 表示要删除节点的偏移	param3 无意义 param4 无意义
+    433          //		 op_type == OP_TYPE_REPLACE_NODE 时,	param1 表示记录类型, param2 表示要替换节点的偏移	param3 表示替换节点的长度  param4 指向新替换节点数据
+    434          //		 op_type == OP_TYPE_WRITE_BIN_FILE 时,	param1 表示记录类型, param2 表示文件类型	param3 无意义  param4 无意义
+    435          static int save_log_file(void *data,unsigned int len)
+    436          {
+    437          	unsigned int tmp;
+    438          	unsigned int llen;
+    439          	unsigned char tmp_buffer[530];
+    440          	//将该操作保存到日志文件中
+    441          	if (f_open(&file3,log_file,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+    442          	{
+    443          		return -1;
+    444          	}
+    445          
+    446          	if (log_len == 0)
+    447          	{
+    448          		llen = len+4;
+    449          	}
+    450          	else
+    451          	{
+    452          		llen = log_len+len;
+    453          	}
+    454          	
+    455          	f_lseek(&file3,file3.fsize-log_len);
+    456          
+    457          	if (log_len)
+    458          	{
+    459          		if (f_read(&file3,(void*)&tmp_buffer,log_len,&tmp) != FR_OK)
+    460          		{
+    461          			f_close(&file3);
+    462          			return -1;
+    463          		}
+    464          
+    465          		if (tmp != log_len)
+    466          		{		
+    467          			f_close(&file3);
+    468          			return -1;
+    469          		}
+    470          	}
+    471          	memcpy((void*)tmp_buffer,(void*)&llen,4);
+    472          	if (log_len)
+    473          	{
+    474          		memcpy((void*)(tmp_buffer+log_len),data,len);
+    475          	}
+    476          	else
+    477          	{
+    478          		memcpy((void*)(tmp_buffer+4),data,len);
+    479          	}
+    480          	
+    481          	f_lseek(&file3,file3.fsize-log_len);
+    482          	if(f_write(&file3,tmp_buffer,llen,&tmp) != FR_OK)
+    483          	{
+    484          		f_close(&file3);
+    485          		return -1;
+    486          	}
+    487          
+    488          	if (tmp != llen)
+    489          	{
+    490          		f_close(&file3);
+    491          		return -1;
+    492          	}
+    493          	f_close(&file3);		//关闭日志文件
+    494          	log_len = llen;
+    495                  return 0;
+    496          }
+    497          
+    498          
+    499          //清除日志文件最新添加的日志
+    500          int clear_log_file(int mode)
+    501          {
+    502          	if (f_open(&file3,log_file,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+    503          	{
+    504          		return -1;
+    505          	}
+    506          
+    507          	if (mode)
+    508          	{
+    509          		f_lseek(&file3,0);
+    510          	}
+    511          	else
+    512          	{
+    513          		if (file3.fsize >= log_len)
+    514          		{
+    515          			f_lseek(&file3,file3.fsize-log_len);
+    516          		}
+    517          	}
+    518          	f_truncate(&file3);
+    519          
+    520          	f_close(&file3);
+    521          	return 0;
+    522          }
+    523          
+    524          /**
+    525          * @brief 增加一条记录
+    526          * @param[in] unsigned char *precord 记录指针
+    527          * @return 0:成功
+    528          *        else:失败
+    529          * @note 此函数已经增加断电保护
+    530          */
+    531          int record_add(unsigned char rectype,unsigned char *precord)
+    532          {
+    533          	unsigned char	dir_str[35];
+    534          	unsigned char	dir_tmp[35];
+    535          	unsigned char	inf_file_str[35];
+    536          	unsigned int	rec_offset,i;
+    537          	unsigned int	node_size,tmp;
+    538          	unsigned long	hash_value[10];
+    539          	const unsigned char	*p_hash_table_file[11];
+    540          	unsigned int		link_end;		//链表的尾地址
+    541          	const unsigned char	*target_dir;
+    542          	unsigned int		target_max_cnt;
+    543          	unsigned int		invalid_node_offset = 0;
+    544          	unsigned int		temp;
+    545          	int					err_code = 0;
+    546          	unsigned int		log_data[3];
+    547          
+    548          	log_len = 0;
+    549          
+    550          	if (REC_TYPE_GOODS_LIST == rectype)
+    551          	{
+    552          		target_dir = goods_list_dirctory;
+    553          		strcpy(dir_str,goods_list_dirctory);
+    554          		strcat(dir_str,goods_list_file);
+    555          		node_size = sizeof(TGOODS_SPEC_RECORD);
+    556          		target_max_cnt = GOODS_LIST_MAX_CNT;
+    557          
+    558          		hash_value[0] = HashString(((TGOODS_SPEC_RECORD*)precord)->bar_code,0);	//计算该商品条码的hash值
+    559          		//hash_value[1] = HashString(((TGOODS_SPEC_RECORD*)precord)->name,0);		//计算该商品名称的hash值
+    560          		p_hash_table_file[0] = barcode_hash_table_file;
+    561          		//p_hash_table_file[1] = name_hash_table_file;
+    562          		p_hash_table_file[1] = 0;
+    563          	}
+    564          	else if (REC_TYPE_CHECK == rectype)
+    565          	{
+    566          		target_dir = check_dirctory;
+    567          		strcpy(dir_str,check_dirctory);
+    568          		strcat(dir_str,check_list_file);
+    569          		node_size = sizeof(TCHECK_INFO_RECORD);
+    570          		hash_value[0] = HashString(((TCHECK_INFO_RECORD*)precord)->bar_code,0);	//计算该商品条码的hash值
+    571          		p_hash_table_file[0] = barcode_hash_table_file;
+    572          		p_hash_table_file[1] = 0;
+    573          		target_max_cnt = CHECK_LIST_MAX_CNT;		
+    574          	}
+    575          	else if (REC_TYPE_BATCH == rectype)
+    576          	{
+    577          		target_dir = batch_dirctory;
+    578          		strcpy(dir_str,batch_dirctory);
+    579          		strcat(dir_str,batch_list_file);
+    580          		node_size = sizeof(TBATCH_NODE);
+    581          		hash_value[0] = 2;	//计算该商品条码的hash值
+    582          		p_hash_table_file[0] = batch_inf_file;
+    583          		p_hash_table_file[1] = 0;
+    584          		target_max_cnt = BATCH_LIST_MAX_CNT;		
+    585          	}
+    586          	else
+    587          	{
+    588          		return -1;
+    589          	}
+    590          
+    591          	if (REC_TYPE_BATCH == rectype)
+    592          	{
+    593          
+    594          		strcpy(inf_file_str,batch_dirctory);
+    595          		strcat(inf_file_str,batch_inf_file);
+    596          
+    597          		if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    598          		{
+    599          			return -2;
+    600          		}
+    601          
+    602          		if (file1.fsize > 12)
+    603          		{
+    604          			f_lseek(&file1,file1.fsize-4);
+    605          			if ((f_read(&file1,(void*)&invalid_node_offset,4,&tmp) != FR_OK) ||(tmp != 4))		//获取保存在序列号信息文件中的某一个已经被删除节点的偏移
+    606          			{
+    607          				f_close(&file1);
+    608          				return -4;
+    609          			}
+    610          		}
+    611          
+    612          		f_close(&file1);
+    613          	}
+    614          
+    615          	//打开保存相应记录的节点文件
+    616          	if (f_open(&file1,(const char*)dir_str,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+    617          	{
+    618          		return -2;
+    619          	}
+    620          
+    621          	if (invalid_node_offset)
+    622          	{
+    623          		rec_offset = invalid_node_offset;		//如果是新增序列号节点，并且记录文件中存在已经被删除的节点，那么新增的节点
+    624          	}
+    625          	else
+    626          	{
+    627          		rec_offset = file1.fsize/node_size;		//获取记录文件当前已经保存的记录数
+    628          		if (rec_offset < target_max_cnt)
+    629          		{
+    630          			rec_offset += 1;	
+    631          		}
+    632          		else
+    633          		{
+    634          			//rec_offset = 1;		//如果记录数达到了上限值，那么无法增加新记录
+    635          			f_close(&file1);
+    636          			return -20;
+    637          		}
+    638          	}
+    639          
+    640          	g_rec_offset = rec_offset;
+    641          #ifdef REC_DEBUG
+    642          	debug_out("\x0d\x0a",2,1);
+    643          	debug_out("Add Node:",strlen("Add Node:"),1);
+    644          	debug_out((unsigned char*)&rec_offset,4,0);
+    645          #endif
+    646          
+    647          	log_data[0] = OP_TYPE_ADD_NODE;
+    648          	log_data[1] = rectype;
+    649          	log_data[2] = rec_offset;
+    650          
+    651          
+    652          	if (save_log_file((void*)log_data,12))		//状态0，LOG文件中只保存了操作类型、记录类型、目标记录偏移
+    653          	{
+    654          		err_code = -10;
+    655          		goto err_handle;
+    656          	}
+    657          
+    658          	//计算此记录需要计算的关键字的hash值
+    659          	i = 0;
+    660          	while (p_hash_table_file[i])
+    661          	{
+    662          		strcpy(dir_str,target_dir);
+    663          		strcat(dir_str,p_hash_table_file[i]);
+    664          
+    665          		//打开相应的hash_table文件
+    666          		if (f_open(&file2,(const char*)dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+    667          		{
+    668          			err_code = -4;
+    669          			goto err_handle;
+    670          		}
+    671          
+    672          		f_lseek(&file2,4*(hash_value[i]%HASH_TABLE_SIZE));		//定位到该hash值在hash表中对应的偏移处
+    673          
+    674          		//读取此hash值对应的链表的尾地址
+    675          		if (f_read(&file2,(void*)&link_end,4,&tmp) != FR_OK)
+    676          		{
+    677          			err_code = -5;
+    678          			goto err_handle;
+    679          		}
+    680          #ifdef REC_DEBUG
+    681          		debug_out(" LinkEnd=",strlen(" LinkEnd="),1);
+    682          		debug_out((unsigned char*)&link_end,4,0);
+    683          #endif
+    684          		log_data[0] = hash_value[i];
+    685          		log_data[1] = link_end;
+    686          		if(save_log_file((void*)log_data,8))		//状态1或者状态2
+    687          		{
+    688          			err_code = -10;
+    689          			goto err_handle;
+    690          		}
+    691          		
+    692          		f_lseek(&file2,4*(hash_value[i]%HASH_TABLE_SIZE));		//定位到该hash值在hash表中对应的偏移处
+    693          
+    694          		//更新该链表的尾节点
+    695          		if (f_write(&file2,(void*)&rec_offset,4,&tmp) != FR_OK)
+    696          		{
+    697          			err_code = -6;
+    698          			goto err_handle;
+    699          		}
+    700          
+    701          		if (tmp != 4)
+    702          		{
+    703          			err_code = -6;
+    704          			goto err_handle;
+    705          		}
+    706          
+    707          		f_sync(&file2);
+    708          
+    709          		if (REC_TYPE_BATCH == rectype)
+    710          		{
+    711          			f_lseek(&file2,4);
+    712          			if (f_read(&file2,(void*)&temp,4,&tmp) != FR_OK)
+    713          			{
+    714          				err_code = -7;
+    715          				goto err_handle;
+    716          			}
+    717          
+    718          			if (temp == 0)
+    719          			{
+    720          				//如果链表的首节点还是0，那么需要更新链表的首节点
+    721          				f_lseek(&file2,4);
+    722          				if (f_write(&file2,(void*)&rec_offset,4,&tmp) != FR_OK)
+    723          				{
+    724          					err_code = -8;
+    725          					goto err_handle;
+    726          				}
+    727          
+    728          				if (tmp != 4)
+    729          				{
+    730          					err_code = -8;
+    731          					goto err_handle;
+    732          				}
+    733          			}
+    734          		}
+    735          
+    736          		f_close(&file2);	//hash表文件可以关闭了
+    737          
+    738          		if (link_end)
+    739          		{
+    740          			//如果链表不是空的，那么需要更新链表的信息(如果是商品信息节点，还需要更新当前节点的信息，因为商品信息链表是双向链表)
+    741          			if (update_link_info_after_addNode(&file1,precord,rectype,(i+1),link_end,rec_offset))
+    742          			{
+    743          				err_code = -9;
+    744          				goto err_handle;
+    745          			}
+    746          		}
+    747          
+    748          		i++;
+    749          	}
+    750          
+    751          	calc_check_value(rectype,precord);
+    752          
+    753          	if (save_log_file((void*)precord,node_size))
+    754          	{
+    755          		err_code = -8;
+    756          		goto err_handle;
+    757          	}
+    758          
+    759          	f_lseek(&file1,(rec_offset-1)*node_size);		//将文件指针移到文件末尾
+    760          	if (f_write(&file1,precord,node_size,&tmp) != FR_OK)
+    761          	{
+    762          		err_code = -3;	 
+    763          		goto err_handle;
+    764          	}
+    765          
+    766          	if (tmp != node_size)
+    767          	{
+    768          		err_code = -3;	 
+    769          		goto err_handle;
+    770          	}
+    771          
+    772          	//保存节点的文件可以关闭了
+    773          	f_close(&file1);	
+    774          
+    775          	if (invalid_node_offset)
+    776          	{
+    777          		if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_WRITE | FA_READ) != FR_OK)
+    778          		{
+    779          			return -2;
+    780          		}
+    781          
+    782          		f_lseek(&file1,file1.fsize-4);
+    783          		f_truncate(&file1);		//将记录在信息文件中的已经删除的节点偏移清掉。
+    784          		f_close(&file1);
+    785          	}
+    786          	
+    787          	clear_log_file(0);
+    788          	return 0;
+    789          
+    790          err_handle:
+    791          
+    792          	f_close(&file1);
+    793          	return err_code;
+    794          
+    795          }
+    796          
+    797          /**
+    798          * @brief 增加一条记录
+    799          * @param[in] unsigned char *precord 记录指针
+    800          * @param[in] unsigned char open_mode 是都需要重新打开文件		0:需要  else:不需要
+    801          * @param[in] unsigned char close_mode 是否需要关闭操作文件		0:需要  else:不需要
+    802          * @return 0:成功
+    803          *        -1:失败
+    804          * @note 此函数暂时没有考虑断电保护，后续需要增加断电保护功能
+    805          */
+    806          int record_add_ext(unsigned char rectype,unsigned char *precord,unsigned char open_mode,unsigned char close_mode)
+    807          {
+    808          	//
+    809          }
+    810          
+    811          /**
+    812          * @brief 将一个商品信息节点添加到相应链表中
+    813          * @param[in] FIL* node_file							该节点所在的文件（已经处于open的状态）
+    814          * @param[in] unsigned char link_type				链表类型	1:条码链表	2:名称链表 
+    815          * @param[in] TGOODS_SPEC_RECORD *p_TGOODS_SPEC_RECORD				该商品节点的指针
+    816          * @param[in] unsigned int key_hashvalue				该节点相应关键字的hash值	
+    817          * @return 0:成功
+    818          *        -1:失败
+    819          * @note  此函数只支持添加商品信息节点
+    820          *	     node_file 已经处于打开的状态
+    821          */
+    822          static int add_goods_node(FIL* node_file,unsigned char link_type,TGOODS_SPEC_RECORD *p_goods_node,unsigned int key_hashvalue,unsigned int index)
+    823          {
+    824          	unsigned char dir_str[35];
+    825          	const unsigned char * target_hash_file;
+    826          	unsigned int		  target_offset,link_end,tmp;
+    827          
+    828          	strcpy(dir_str,goods_list_dirctory);
+    829          	//if ((link_type == 1)||(link_type == 2))
+    830          	if (link_type == 1)
+    831          	{
+    832          		target_hash_file = barcode_hash_table_file;
+    833          		target_offset = 4*(key_hashvalue%HASH_TABLE_SIZE);
+    834          	}
+    835          	else
+    836          	{
+    837          		return -1;
+    838          	}
+    839          
+    840          	strcat(dir_str,target_hash_file);
+    841          	if (f_open(&file2,dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+    842          	{
+    843          		return -2;
+    844          	}
+    845          
+    846          	f_lseek(&file2,target_offset);
+    847          	//获取链表的尾地址
+    848          	if (f_read(&file2,(void*)&link_end,4,&tmp) != FR_OK)
+    849          	{
+    850          		return -3;
+    851          	}
+    852          
+    853          	//更新链表的尾地址
+    854          	f_lseek(&file2,target_offset);
+    855          	if (f_write(&file2,(void*)&index,4,&tmp) != FR_OK)
+    856          	{
+    857          		return -4;
+    858          	}
+    859          
+    860          	if (tmp != 4)
+    861          	{
+    862          		return -4;
+    863          	}
+    864          
+    865          	f_sync(&file2);
+    866          
+    867          	if (link_end == 0)
+    868          	{
+    869          		//如果链表的尾地址为0
+    870          		p_goods_node->by_barcode_next = 0;
+    871          		p_goods_node->by_barcode_prev = 0;
+    872          		f_close(&file2);
+    873          	}
+    874          	else
+    875          	{
+    876          		f_close(&file2);
+    877          		if (link_end != index)
+    878          		{
+    879          			if(update_link_info_after_addNode(node_file,(unsigned char*)p_goods_node,1,link_type,link_end,index))
+    880          			{
+    881          				return -5;
+    882          			}
+    883          		}
+    884          	}
+    885          
+    886          	return 0;
+    887          }
+    888          /**
+    889          * @brief 将一个商品信息节点从某一个链表中删除
+    890          * @param[in] FIL* node_file							该节点所在的文件（已经处于open的状态）
+    891          * @param[in] unsigned char link_type				链表类型	1:条码链表	2:名称链表
+    892          * @param[in] TGOODS_SPEC_RECORD *p_TGOODS_SPEC_RECORD				该商品节点的指针
+    893          * @param[in] unsigned int key_hashvalue				该节点相应关键字的hash值	
+    894          * @return 0:成功
+    895          *        -1:失败
+    896          * @note  此函数只支持删除商品信息链表
+    897          *	     node_file 已经处于打开的状态
+    898          */
+    899          static int delete_goods_node(FIL* node_file,unsigned char link_type,TGOODS_SPEC_RECORD *p_goods_node,unsigned int key_hashvalue)
+    900          {
+    901          	const unsigned char *target_hash_file = 0;
+    902          	unsigned char		tmp_buffer[512];
+    903          	unsigned char		dir_str[35];
+    904          	unsigned int		new_link_end,target_offset,i,tmp;
+    905          
+    906          
+    907          	//if ((link_type == 1)||(link_type == 2))
+    908          	if (link_type == 1)
+    909          	{
+    910          		if (p_goods_node->by_barcode_next == 0)
+    911          		{
+    912          			//说明该节点是相应规格链表的尾节点，那么需要更新相应规格的hash_table文件
+    913          			target_hash_file = barcode_hash_table_file;
+    914          			new_link_end = p_goods_node->by_barcode_prev;	//新的链表尾地址指针
+    915          			p_goods_node->by_barcode_prev = 0;					//将当前节点的next指针清0
+    916          			target_offset = 4*(key_hashvalue%HASH_TABLE_SIZE);
+    917          		}
+    918          		else
+    919          		{
+    920          			f_lseek(node_file,(p_goods_node->by_barcode_next - 1)*sizeof(TGOODS_SPEC_RECORD));
+    921          
+    922          			if (f_read(node_file,tmp_buffer,sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+    923          			{
+    924          				return -6;
+    925          			}
+    926          
+    927          			((TGOODS_SPEC_RECORD*)tmp_buffer)->by_barcode_prev = p_goods_node->by_barcode_prev;
+    928          			calc_check_value(REC_TYPE_GOODS_LIST,tmp_buffer);
+    929          
+    930          			f_lseek(node_file,(p_goods_node->by_barcode_next - 1)*sizeof(TGOODS_SPEC_RECORD));
+    931          
+    932          			//更新了该节点的后一个节点的prev指针
+    933          			if (f_write(node_file,tmp_buffer,sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+    934          			{
+    935          				return -7;
+    936          			}
+    937          
+    938          			if (tmp != sizeof(TGOODS_SPEC_RECORD))
+    939          			{
+    940          				return -7;
+    941          			}
+    942          
+    943          			f_sync(node_file);
+    944          		}
+    945          
+    946          		if (p_goods_node->by_barcode_prev)
+    947          		{
+    948          			//如果该节点还有前一个节点，那么它的next节点也需要更新
+    949          			f_lseek(node_file,(p_goods_node->by_barcode_prev - 1)*sizeof(TGOODS_SPEC_RECORD));
+    950          
+    951          			if (f_read(node_file,tmp_buffer,sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+    952          			{
+    953          				return -8;
+    954          			}
+    955          
+    956          			((TGOODS_SPEC_RECORD*)tmp_buffer)->by_barcode_next = p_goods_node->by_barcode_next;
+    957          			calc_check_value(REC_TYPE_GOODS_LIST,tmp_buffer);
+    958          
+    959          			f_lseek(node_file,(p_goods_node->by_barcode_prev - 1)*sizeof(TGOODS_SPEC_RECORD));
+    960          
+    961          			//更新了该节点的前一个节点的next指针
+    962          			if (f_write(node_file,tmp_buffer,sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+    963          			{
+    964          				return -9;
+    965          			}
+    966          
+    967          			if (tmp != sizeof(TGOODS_SPEC_RECORD))
+    968          			{
+    969          				return -9;
+    970          			}
+    971          
+    972          			f_sync(node_file);
+    973          		}
+    974          
+    975          		//至此为止，可以将该节点自身的前后节点指针清除掉
+    976          		p_goods_node->by_barcode_prev = 0;
+    977          		p_goods_node->by_barcode_next = 0;
+    978          	}
+    979          	else
+    980          	{
+    981          		return -1;
+    982          	}
+    983          
+    984          	if (target_hash_file)
+    985          	{
+    986          		//需要更新相应的hash_table文件
+    987          		strcpy(dir_str,goods_list_dirctory);
+    988          		strcat(dir_str,target_hash_file);
+    989          
+    990          		if (f_open(&file2,dir_str,FA_OPEN_EXISTING | FA_WRITE) != FR_OK)
+    991          		{
+    992          			return -2;
+    993          		}
+    994          
+    995          		f_lseek(&file2,target_offset);
+    996          		if (f_write(&file2,(void*)&new_link_end,4,&tmp) != FR_OK)
+    997          		{
+    998          			return -5;
+    999          		}
+   1000          
+   1001          		if (tmp != 4)
+   1002          		{
+   1003          			return -5;
+   1004          		}
+   1005          
+   1006          		f_close(&file2);
+   1007          	}
+   1008          
+   1009          	return 0;
+   1010          }
+   1011          
+   1012          /**
+   1013          * @brief 取代某一条记录
+   1014          * @param[in] unsigned char rectype					记录类型
+   1015          * @param[in] int			index					记录索引
+   1016          * @param[in] unsigned char *p_new_record			新记录
+   1017          * @param[in] unsigned char *key_value_change_tbl	记录替换时，关键字发生变化的列表
+   1018          * @return 0:成功
+   1019          *        -1:失败
+   1020          * @note  如果替换记录（节点）时，新的节点的关键字发生了变化，那么需要将已经修改的关键字的相应编号生成一张表传进来，以0结束
+   1021          *		 关键的编号如下：1: 表示条形码关键字（实际上这个关键字不可能发生变化）;
+   1022          *						 2: 名称关键字
+   1023          */
+   1024          int record_module_replace(unsigned char rectype,int index,unsigned char *p_new_record,TNODE_MODIFY_INFO *modify_info_tbl)
+   1025          {
+   1026          	unsigned char		dir_str[35];
+   1027          	unsigned int		node_size,tmp;
+   1028          	unsigned int		i;
+   1029          	unsigned int		log_data[6];
+   1030          
+   1031          	if (index == 0)
+   1032          	{
+   1033          		return -1;
+   1034          	}
+   1035          	if (REC_TYPE_GOODS_LIST == rectype)
+   1036          	{
+   1037          		strcpy(dir_str,goods_list_dirctory);
+   1038          		strcat(dir_str,goods_list_file);
+   1039          		node_size = sizeof(TGOODS_SPEC_RECORD);
+   1040          	}
+   1041          	else if (REC_TYPE_CHECK == rectype)
+   1042          	{
+   1043          		strcpy(dir_str,check_dirctory);
+   1044          		strcat(dir_str,check_list_file);
+   1045          		node_size = sizeof(TCHECK_INFO_RECORD);
+   1046          	}
+   1047          	else
+   1048          	{
+   1049          		return -1;
+   1050          	}
+   1051          
+   1052          	if (f_open(&file1,(const char*)dir_str,FA_OPEN_EXISTING | FA_WRITE | FA_READ) != FR_OK)
+   1053          	{
+   1054          		return -2;
+   1055          	}
+   1056          #if 0
+   1057          	if (REC_TYPE_GOODS_LIST == rectype)
+   1058          	{
+   1059          		if ((modify_info_tbl)&&(modify_info_tbl[0].keyspec_type))
+   1060          		{
+   1061          			//有关键字发生变化，那么需要更新该节点所在链表的信息
+   1062          			i = 0;
+   1063          			while(modify_info_tbl[i].keyspec_type)
+   1064          			{
+   1065          				switch (modify_info_tbl[i].keyspec_type)
+   1066          				{
+   1067          				case TAG_NAME:
+   1068          					//从原来的链表中删除，增加到新的链表中
+   1069          
+   1070          					//保存日志文件
+   1071          					log_len = 0;
+   1072          					log_data[0] = OP_TYPE_REPLACE_NODE;
+   1073          					log_data[1] = rectype;
+   1074          					log_data[2] = index;
+   1075          					log_data[3] = modify_info_tbl[i].old_keyspec_hash;
+   1076          					log_data[4] = modify_info_tbl[i].new_keyspec_hash;
+   1077          					
+   1078          					strcpy(dir_str,goods_list_dirctory);
+   1079          					strcat(dir_str,name_hash_table_file);
+   1080          					if (f_open(&file2,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   1081          					{
+   1082          						return -6;
+   1083          					}
+   1084          
+   1085          					f_lseek(&file2,4*(modify_info_tbl[i].new_keyspec_hash%HASH_TABLE_SIZE));
+   1086          					//获取链表的尾地址
+   1087          					if (f_read(&file2,(void*)&log_data[5],4,&tmp) != FR_OK)
+   1088          					{
+   1089          						return -6;
+   1090          					}
+   1091          
+   1092          					f_close(&file2);
+   1093          					
+   1094          					if(save_log_file((void*)log_data,24))
+   1095          					{
+   1096          						return -6;
+   1097          					}
+   1098          
+   1099          					if(save_log_file((void*)p_new_record,node_size))
+   1100          					{
+   1101          						return -6;
+   1102          					}
+   1103          
+   1104          					if(delete_goods_node(&file1,modify_info_tbl[i].keyspec_type,(TGOODS_SPEC_RECORD*)p_new_record,modify_info_tbl[i].old_keyspec_hash))
+   1105          					{
+   1106          						f_close(&file1);
+   1107          						return -4;
+   1108          					}
+   1109          
+   1110          					if (add_goods_node(&file1,modify_info_tbl[i].keyspec_type,(TGOODS_SPEC_RECORD*)p_new_record,modify_info_tbl[i].new_keyspec_hash,index))
+   1111          					{
+   1112          						f_close(&file1);
+   1113          						return -5;
+   1114          					}
+   1115          					break;
+   1116          				default:
+   1117          					break;
+   1118          				}
+   1119          
+   1120          				i++;
+   1121          			}
+   1122          
+   1123          		}
+   1124          	}
+   1125          #endif
+   1126          
+   1127          	calc_check_value(rectype,p_new_record);
+   1128          	f_lseek(&file1,(index - 1)*node_size);
+   1129          
+   1130          	if (f_write(&file1,(void*)p_new_record,node_size,&tmp) != FR_OK)
+   1131          	{
+   1132          		f_close(&file1);
+   1133          		return -3;
+   1134          	}
+   1135          
+   1136          	if (tmp != node_size)
+   1137          	{
+   1138          		f_close(&file1);
+   1139          		return -3;
+   1140          	}
+   1141          	f_close(&file1);
+   1142          
+   1143          	if ((REC_TYPE_GOODS_LIST == rectype)&&(modify_info_tbl)&&(modify_info_tbl[0].keyspec_type))
+   1144          	{
+   1145          		clear_log_file(0);		//清除日志
+   1146          	}
+   1147          	
+   1148          	return 0;
+   1149          }
+   1150          
+   1151          
+   1152          /**
+   1153          * @brief 得到记录总条数
+   1154          * @return 0...LOGIC_RECORD_BLOCK_SIZE
+   1155          */
+   1156          int record_module_count(unsigned char rectype)
+   1157          {
+   1158          	unsigned char dir_str[35];
+   1159          	unsigned char inf_file_str[35];
+   1160          	int		cnt,rec_size;
+   1161          	if (rectype == REC_TYPE_GOODS_LIST)
+   1162          	{
+   1163          		strcpy(dir_str,goods_list_dirctory);
+   1164          		strcat(dir_str,goods_list_file);
+   1165          		rec_size = sizeof(TGOODS_SPEC_RECORD);
+   1166          	}
+   1167          	else if (rectype == REC_TYPE_CHECK)
+   1168          	{
+   1169          		strcpy(dir_str,check_dirctory);
+   1170          		strcat(dir_str,check_list_file);
+   1171          		rec_size = sizeof(TCHECK_INFO_RECORD);
+   1172          	}
+   1173          	else if (rectype == REC_TYPE_BATCH)
+   1174          	{
+   1175          		strcpy(dir_str,batch_dirctory);
+   1176          		strcat(dir_str,batch_list_file);
+   1177          		rec_size = sizeof(TBATCH_NODE);
+   1178          	}
+   1179          	else
+   1180          	{
+   1181          		return 0;
+   1182          	}
+   1183          
+   1184          	if (f_open(&file1,(const char*)dir_str,FA_OPEN_ALWAYS | FA_READ) != FR_OK)
+   1185          	{
+   1186          		return -1;
+   1187          	}
+   1188          
+   1189          	cnt = file1.fsize / rec_size;
+   1190          	f_close(&file1);
+   1191          
+   1192          	if (REC_TYPE_BATCH == rectype)
+   1193          	{
+   1194          		strcpy(inf_file_str,batch_dirctory);
+   1195          		strcat(inf_file_str,batch_inf_file);
+   1196          	
+   1197          		if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   1198          		{
+   1199          			return -1;
+   1200          		}
+   1201          
+   1202          		if (cnt >= (file1.fsize - 12)/4)
+   1203          		{
+   1204          			cnt -= (file1.fsize - 12)/4;		//减去无效的节点，理论上无效的节点的偏移都记录在信息文件中，所以直接减去在信息文件中记录的无效节点个数，即表示在节点文件中还存在的节点个数。
+   1205          			f_close(&file1);
+   1206          		}
+   1207          		else
+   1208          		{
+   1209          			//理论上应该不会出现这种情况！万一真出现了呢？尼玛，那只能来杀手锏了，直接将记录文件全部初始化
+   1210          			f_close(&file1);
+   1211          			record_clear(rectype);
+   1212          			cnt = 0;
+   1213          		}
+   1214          	}
+   1215          	return cnt;
+   1216          }
+   1217          
+   1218          /**
+   1219          * @brief 清除所有记录
+   1220          * @return 0：成功  -1：失败
+   1221          */
+   1222          int record_clear(unsigned char rectype)
+   1223          {
+   1224          	unsigned char	dir_str[35];
+   1225          	unsigned char	dir_tmp[35];
+   1226          	const unsigned char	*p_hash_table_file[3];
+   1227          	const unsigned char	*target_dir;
+   1228          	int i;
+   1229          	unsigned int		log_data[2];
+   1230          
+   1231          	if (rectype == REC_TYPE_GOODS_LIST)
+   1232          	{
+   1233          		target_dir = goods_list_dirctory;
+   1234          		strcpy(dir_str,goods_list_dirctory);
+   1235          		strcat(dir_str,goods_list_file);
+   1236          
+   1237          		p_hash_table_file[0] = barcode_hash_table_file;
+   1238          		p_hash_table_file[1] = 0;
+   1239          	}
+   1240          	else if (rectype == REC_TYPE_CHECK)
+   1241          	{
+   1242          		target_dir = check_dirctory;
+   1243          		strcpy(dir_str,check_dirctory);
+   1244          		strcat(dir_str,check_list_file);
+   1245          		p_hash_table_file[0] = barcode_hash_table_file;
+   1246          		p_hash_table_file[1] = 0;
+   1247          	}
+   1248          	else if (rectype == REC_TYPE_BATCH)
+   1249          	{
+   1250          		target_dir = batch_dirctory;
+   1251          		strcpy(dir_str,batch_dirctory);
+   1252          		strcat(dir_str,batch_list_file);
+   1253          		p_hash_table_file[0] = batch_inf_file;
+   1254          		p_hash_table_file[1] = 0;
+   1255          	}
+   1256          	else
+   1257          	{
+   1258          		return -1;
+   1259          	}
+   1260          
+   1261          	if (f_open(&file1,(const char*)dir_str,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+   1262          	{
+   1263          		return -1;
+   1264          	}
+   1265          
+   1266          	f_lseek(&file1,0);		//文件指针移动到文件开始
+   1267          
+   1268          	//将文件截断到文件开始
+   1269          	if (f_truncate(&file1) != FR_OK)
+   1270          	{
+   1271          		f_close(&file1);
+   1272          		return -2;
+   1273          	}
+   1274          
+   1275          	f_close(&file1);
+   1276          
+   1277          
+   1278          
+   1279          	log_data[0] = OP_TYPE_CLEAR_NODE;
+   1280          	log_data[1] = rectype;
+   1281          	log_len = 0;
+   1282          	if (save_log_file((void*)log_data,8))		//状态0，LOG文件中只保存了操作类型、记录类型
+   1283          	{
+   1284          		return -4;
+   1285          	}
+   1286          
+   1287          	i = 0;
+   1288          	while (p_hash_table_file[i])
+   1289          	{
+   1290          		strcpy(dir_str,target_dir);
+   1291          		strcat(dir_str,p_hash_table_file[i]);
+   1292          
+   1293          		//打开相应的hash_table文件
+   1294          		if (f_open(&file2,(const char*)dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   1295          		{
+   1296          			return -3;
+   1297          		}
+   1298          
+   1299          		if (rectype == REC_TYPE_BATCH)
+   1300          		{
+   1301          			init_data_info_file(&file2);	
+   1302          		}
+   1303          		else
+   1304          		{
+   1305          			init_hash_table_file(&file2);	
+   1306          		}
+   1307          		f_close(&file2);
+   1308                  i++;
+   1309          	}
+   1310          
+   1311          	clear_log_file(0);		//清除日志
+   1312          	return 0;
+   1313          }
+   1314          
+   1315          /**
+   1316          * @brief 根据某一个关键字查询交易记录，返回记录节点的偏移
+   1317          * @param[in] unsigned char rectype				要搜索的记录区
+   1318          * @param[in] unsigned char search_tag_type		要匹配的关键字类型
+   1319          * @param[in] unsigned char *in_tag				要匹配的关键字字符串
+   1320          * @param[out] unsigned char *outbuf				搜索到的记录缓冲区
+   1321          * @return 搜索结果	=0:没有搜索到该交易记录  > 0:搜索到的记录的偏移   < 0: 错误类型
+   1322          * @note  
+   1323          */
+   1324          static int rec_search(unsigned char rectype,unsigned char search_tag_type,unsigned char *in_tag,unsigned char *outbuf)
+   1325          {
+   1326          	unsigned int hash_value,link_end,tmp;
+   1327          	unsigned char dir_str[35];
+   1328          	unsigned char	dir_tmp[35];
+   1329          	unsigned char	buffer[512];		//如果一个节点的大小超过了512，那么还需要增加此临时空间
+   1330          	const unsigned char	*	target_index_file;
+   1331          	const unsigned char	*	target_directory;
+   1332          	const unsigned char	*	target_node_file;
+   1333          	unsigned int	node_size;				//节点大小
+   1334          	unsigned int	target_offset;			//节点中要与关键字匹配的字符串位于节点结构体中的偏移
+   1335          	unsigned int	target_prev_offset;		//该节点对应关键字的链表指针在GOOD_NODE结构体中相对于by_barcode_next的偏移
+   1336          	//注意：上述两个值与结构体中分配给每个数据域空间的大小密切相关，所以如果结构体修改，此函数中这些地方要做相应的修改	
+   1337          
+   1338          	if (REC_TYPE_GOODS_LIST == rectype)
+   1339          	{
+   1340          		target_directory = goods_list_dirctory;
+   1341          		target_node_file = goods_list_file;
+   1342          		node_size = sizeof(TGOODS_SPEC_RECORD);
+   1343          		switch (search_tag_type)
+   1344          		{
+   1345          		case TAG_BARCODE:
+   1346          			target_index_file = barcode_hash_table_file;
+   1347          			target_offset = 4;
+   1348          			target_prev_offset = 0;
+   1349          			break;
+   1350          		//case TAG_NAME:
+   1351          		//	target_index_file = name_hash_table_file;
+   1352          		//	target_offset = 4+31;												
+   1353          		//	target_prev_offset = 1;
+   1354          		//	break;
+   1355          		default:
+   1356          			return -1;		//参数错误
+   1357          		}
+   1358          	}
+   1359          	else if (REC_TYPE_CHECK == rectype)
+   1360          	{
+   1361          		node_size = sizeof(TCHECK_INFO_RECORD);
+   1362          		target_node_file = check_list_file;
+   1363          		target_directory = check_dirctory;
+   1364          
+   1365          		if (search_tag_type == TAG_BARCODE)
+   1366          		{
+   1367          			target_index_file = barcode_hash_table_file;
+   1368          			target_offset = 4;						//条形码位于操作记录节点记录起始位置的偏移4字节处											
+   1369          			target_prev_offset = 0;
+   1370          		}
+   1371          		else
+   1372          		{
+   1373          			return -1;
+   1374          		}
+   1375          	}
+   1376          	else
+   1377          	{
+   1378          		return -1;
+   1379          	}
+   1380          
+   1381          	memset(outbuf,0,node_size);		//清掉返回数据的缓冲区
+   1382          	strcpy(dir_str,target_directory);
+   1383          
+   1384          
+   1385          	//如果要搜索的关键字类型是条码
+   1386          
+   1387          	//step1: 计算关键字的hash值
+   1388          	hash_value = HashString(in_tag,0);	
+   1389          
+   1390          	//step2: 根据hash值查找到与该关键字具有相同hash值模值的链表尾地址
+   1391          	strcat(dir_str,target_index_file);		
+   1392          	if (f_open(&file1,dir_str,FA_OPEN_ALWAYS | FA_READ) != FR_OK)
+   1393          	{
+   1394          		return -1;
+   1395          	}
+   1396          
+   1397          	f_lseek(&file1,4*(hash_value%HASH_TABLE_SIZE));
+   1398          
+   1399          	if (f_read(&file1,(void*)&link_end,4,&tmp) != FR_OK)
+   1400          	{
+   1401          		return -2;
+   1402          	}	
+   1403          
+   1404          	f_close(&file1);
+   1405          
+   1406          	//根据读取出来的链表首地址查找到第一个与关键字完全匹配的记录，如果需要将完全匹配关键字的所有记录全部都读取出来，需要另外的接口来实现。
+   1407          
+   1408          	if (link_end)
+   1409          	{	
+   1410          		strcpy(dir_str,target_directory);
+   1411          		strcat(dir_str,target_node_file);
+   1412          
+   1413          		//打开商品清单文件
+   1414          		if (f_open(&file1,dir_str,FA_OPEN_ALWAYS | FA_READ) != FR_OK)
+   1415          		{
+   1416          			return -3;
+   1417          		}
+   1418          
+   1419          		while (link_end)
+   1420          		{
+   1421          			f_lseek(&file1,(link_end-1)*node_size);		//文件指针指向该节点的起始位置
+   1422          
+   1423          			if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK) || (node_size != tmp))
+   1424          			{
+   1425          				return -4;
+   1426          			}
+   1427          
+   1428          			if (strcmp(in_tag,buffer+target_offset) == 0)
+   1429          			{
+   1430          				memcpy(outbuf,buffer,node_size);
+   1431          				return link_end;		//搜索到链表中第一个与关键字匹配的节点
+   1432          			}
+   1433          
+   1434          			if (REC_TYPE_GOODS_LIST == rectype)
+   1435          			{
+   1436          				link_end = ((TGOODS_SPEC_RECORD*)buffer)->by_barcode_prev;
+   1437          			}
+   1438          			else if (REC_TYPE_CHECK == rectype)
+   1439          			{
+   1440          				link_end = ((TCHECK_INFO_RECORD*)buffer)->by_barcode_prev;
+   1441          			}
+   1442          		}
+   1443          	}
+   1444          
+   1445          	return 0;		//没有搜索到与关键字匹配的记录
+   1446          }
+   1447          
+   1448          /**
+   1449          * @brief 根据关键字在记录中搜索与之相匹配的记录索引
+   1450          * @param[in] unsigned char rec_type		记录类型
+   1451          * @param[in] unsigned char tag_typa		搜索的关键字类型
+   1452          * @param[in] unsigned char * intag		搜索的关键字字符串
+   1453          * @param[in] unsigned char	inlen		关键字长度
+   1454          * @return 返回搜索到的交易记录的索引号  -1 ：表示没有找到相应的交易记录   else: 搜索到的交易记录的索引号
+   1455          * @note  字符串比较
+   1456          */
+   1457          unsigned char *rec_serachby_name(unsigned char rec_type,unsigned char *intag,unsigned int *r_index)
+   1458          {
+   1459          #if 0
+   1460          	unsigned char					*pBuf;
+   1461          	unsigned int					index = 1;
+   1462          	int								count;
+   1463          	unsigned int					target_spec_rec_index;
+   1464          	*r_index = 0;
+   1465          	unsigned char					buffer[sizeof(TGOODS_SPEC_RECORD)];
+   1466          
+   1467          	if (rec_type != REC_TYPE_CHECK_INFO)
+   1468          	{
+   1469          		return (unsigned char*)0;		//参数错误
+   1470          	}
+   1471          
+   1472          	pBuf = rec_searchby_tag(REC_TYPE_GOODS_LIST,TAG_NAME,intag,&target_spec_rec_index);
+   1473          	if (pBuf == 0)
+   1474          	{
+   1475          		return (unsigned char*)0;
+   1476          	}
+   1477          
+   1478          	memcpy(buffer,pBuf,sizeof(TGOODS_SPEC_RECORD));
+   1479          
+   1480          	return rec_searchby_tag(REC_TYPE_CHECK_INFO,TAG_BARCODE,((TGOODS_SPEC_RECORD*)buffer)->bar_code,r_index);
+   1481          #endif
+   1482          }
+   1483          
+   1484          //在知道链表首地址的前提下，按照某一个关键字搜索链表的节点
+   1485          //@note 链表的首地址不在搜索范围之内。
+   1486          //      操作记录不支持反向搜索
+   1487          static int rec_search_ext(unsigned char rectype,unsigned char search_tag_type,unsigned char *in_tag,unsigned int start,unsigned char direct,unsigned char *outbuf)
+   1488          {
+   1489          	unsigned int  tmp;
+   1490          	unsigned char dir_str[35];
+   1491          	unsigned char dir_tmp[35];
+   1492          	unsigned char	buffer[512];		//如果一个节点的大小超过了512，那么还需要增加此临时空间
+   1493          	const unsigned char	*	target_directory;
+   1494          	const unsigned char	*	target_node_file;
+   1495          	unsigned int	node_size;				//节点大小
+   1496          	unsigned int	target_offset;			//节点中要与关键字匹配的字符串位于节点结构体中的偏移
+   1497          	unsigned int	target_next_offset;		//该节点对应关键字的链表指针在GOOD_NODE结构体中相对于by_barcode_next的偏移
+   1498          	//注意：上述两个值与结构体中分配给每个数据域空间的大小密切相关，所以如果结构体修改，此函数中这些地方要做相应的修改	
+   1499          
+   1500          	if (REC_TYPE_GOODS_LIST == rectype)
+   1501          	{
+   1502          		target_directory = goods_list_dirctory;
+   1503          		target_node_file = goods_list_file;
+   1504          		node_size = sizeof(TGOODS_SPEC_RECORD);
+   1505          		switch (search_tag_type)
+   1506          		{
+   1507          		case TAG_BARCODE:
+   1508          			target_offset = 4;
+   1509          			target_next_offset = 0;
+   1510          			break;
+   1511          		//case TAG_NAME:
+   1512          		//	target_offset = 4+31;												
+   1513          		//	target_next_offset = 1;
+   1514          		//	break;
+   1515          		default:
+   1516          			return -1;		//参数错误
+   1517          		}
+   1518          	}
+   1519          	else if (REC_TYPE_CHECK== rectype)
+   1520          	{
+   1521          		node_size = sizeof(TCHECK_INFO_RECORD);
+   1522          		target_node_file = check_list_file;
+   1523          		target_directory = check_dirctory;
+   1524          
+   1525          		if (search_tag_type == TAG_BARCODE)
+   1526          		{
+   1527          			target_offset = 4;						//条形码位于操作记录节点记录起始位置的偏移4字节处											
+   1528          			target_next_offset = 0;
+   1529          		}
+   1530          		else
+   1531          		{
+   1532          			return -1;
+   1533          		}
+   1534          	}
+   1535          	else
+   1536          	{
+   1537          		return -1;
+   1538          	}
+   1539          
+   1540          	//memset(outbuf,0,node_size);		//清掉返回数据的缓冲区
+   1541          	//strcpy(dir_str,target_directory);
+   1542          
+   1543          	if (start)
+   1544          	{	
+   1545          		strcpy(dir_str,target_directory);
+   1546          		strcat(dir_str,target_node_file);
+   1547          
+   1548          		//打开商品清单文件
+   1549          		if (f_open(&file1,dir_str,FA_OPEN_ALWAYS | FA_READ) != FR_OK)
+   1550          		{
+   1551          			return -3;
+   1552          		}
+   1553          
+   1554          		f_lseek(&file1,(start-1)*node_size);		//文件指针指向该节点的起始位置
+   1555          
+   1556          		if (f_read(&file1,buffer,node_size,&tmp) != FR_OK)
+   1557          		{
+   1558          			return -4;
+   1559          		}
+   1560          
+   1561          		while (start)
+   1562          		{
+   1563          			if (REC_TYPE_GOODS_LIST == rectype)
+   1564          			{
+   1565          				if (direct == 0)
+   1566          				{
+   1567          					start = ((TGOODS_SPEC_RECORD*)buffer)->by_barcode_prev;
+   1568          				}
+   1569          				else
+   1570          				{
+   1571          					start = ((TGOODS_SPEC_RECORD*)buffer)->by_barcode_next;
+   1572          				}
+   1573          			}
+   1574          			else if (REC_TYPE_CHECK == rectype)
+   1575          			{
+   1576          				if (direct == 0)
+   1577          				{
+   1578          					start = ((TCHECK_INFO_RECORD*)buffer)->by_barcode_prev;
+   1579          				}
+   1580          				else
+   1581          				{
+   1582          					start = ((TCHECK_INFO_RECORD*)buffer)->by_barcode_next;
+   1583          				}
+   1584          			}
+   1585          
+   1586          			if (start)
+   1587          			{
+   1588          				f_lseek(&file1,(start-1)*node_size);		//文件指针指向该节点的起始位置
+   1589          
+   1590          				if (f_read(&file1,buffer,node_size,&tmp) != FR_OK)
+   1591          				{
+   1592          					return -4;
+   1593          				}
+   1594          
+   1595          				if (strcmp(in_tag,buffer+target_offset) == 0)
+   1596          				{
+   1597          					memcpy(outbuf,buffer,node_size);
+   1598          					return start;		//搜索到链表中第一个与关键字匹配的节点
+   1599          				}
+   1600          			}
+   1601          		}
+   1602          	}
+   1603          
+   1604          	return 0;		//没有搜索到与关键字匹配的记录
+   1605          }
+   1606          
+   1607          
+   1608          /**
+   1609          * @brief 根据某一个关键字查询交易记录，返回记录指针
+   1610          * @param[in] unsigned char rectype				要搜索的记录区
+   1611          * @param[in] unsigned char search_tag_type		要匹配的关键字类型
+   1612          * @param[in] unsigned char *in_tag				要匹配的关键字字符串
+   1613          * @param[out] int	*index							返回该记录的索引值
+   1614          * @return 搜索结果	0 没有搜索到记录		else 记录指针
+   1615          * @note  实现的时候必须进行字符串比较
+   1616          */
+   1617          unsigned char *rec_searchby_tag(unsigned char rectype,unsigned char search_tag_type,unsigned char *in_tag, int *index)
+   1618          {
+   1619          	unsigned char *pBuf;
+   1620          
+   1621          	pBuf = rec_module_buffer;
+   1622          	*index = rec_search(rectype,search_tag_type,in_tag,pBuf);
+   1623          	if (*index > 0)
+   1624          	{
+   1625          		return pBuf;
+   1626          	}
+   1627          
+   1628          	return (unsigned char *)0;
+   1629          }
+   1630          
+   1631          /**
+   1632          * @brief 根据某一个关键字查询交易记录，返回记录指针
+   1633          * @param[in] unsigned char rectype				要搜索的记录区
+   1634          * @param[in] unsigned char search_tag_type		要匹配的关键字类型
+   1635          * @param[in] unsigned char *in_tag				要匹配的关键字字符串
+   1636          * @param[out] int	*index							返回该记录的索引值
+   1637          * @return 搜索结果	0 没有搜索到记录		else 记录指针
+   1638          * @note  实现的时候必须进行字符串比较
+   1639          */
+   1640          unsigned char *rec_searchby_tag_ext(unsigned char rectype,unsigned char search_tag_type,unsigned char *in_tag, unsigned int start,unsigned char direct,int *index)
+   1641          {
+   1642          	unsigned char *pBuf;
+   1643          
+   1644          	pBuf = rec_module_buffer;
+   1645          	*index = rec_search_ext(rectype,search_tag_type,in_tag,start,direct,pBuf);
+   1646          	if (*index > 0)
+   1647          	{
+   1648          		return pBuf;
+   1649          	}
+   1650          
+   1651          	return (unsigned char *)0;
+   1652          }
+   1653          
+   1654          
+   1655          /**
+   1656          * @brief 获取商品信息记录区中的某一个节点
+   1657          * @param[in] unsigned char mode				ABSOLUTE_SEARCH:绝对位移搜索	RELATIVE_SEARCH:相对位移搜索
+   1658          * @param[in] unsigned int index				记录索引	1:表示第一个节点 
+   1659          * @note
+   1660          */
+   1661          unsigned char *get_goodsnode(int index)
+   1662          {
+   1663          	unsigned char	dir_str[35];
+   1664          	unsigned char	*pBuf;
+   1665          	unsigned int	tmp;
+   1666          	unsigned int	rec_cnt;
+   1667          
+   1668          	if (index == 0)
+   1669          	{
+   1670          		return (unsigned char *)0;
+   1671          	}
+   1672          
+   1673          	pBuf = rec_module_buffer;
+   1674          	rec_cnt = record_module_count(REC_TYPE_GOODS_LIST);
+   1675          
+   1676          	if (index > rec_cnt)
+   1677          	{
+   1678          		return (unsigned char *)0;
+   1679          	}
+   1680          
+   1681          	strcpy(dir_str,goods_list_dirctory);
+   1682          	strcat(dir_str,goods_list_file);
+   1683          	if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   1684          	{
+   1685          		return (unsigned char *)0;
+   1686          	}
+   1687          
+   1688          	f_lseek(&file1,(index-1)*sizeof(TGOODS_SPEC_RECORD));
+   1689          	if (f_read(&file1,(void*)pBuf,512,&tmp) != FR_OK)
+   1690          	{
+   1691          		f_close(&file1);
+   1692          		return (unsigned char *)0;
+   1693          	}
+   1694          	f_close(&file1);
+   1695          	return pBuf;
+   1696          
+   1697          	return (unsigned char *)0;
+   1698          
+   1699          }
+   1700          
+   1701          /**
+   1702          * @brief 删除序列号采集记录文件或者无线采集条码记录文件中的某一个节点
+   1703          * @param[in] unsigned int index	 物理偏移（索引）
+   1704          */
+   1705          int delete_one_node(unsigned char rectype,unsigned int index)
+   1706          {
+   1707          	unsigned char	buffer[sizeof(TBATCH_NODE)];
+   1708          	unsigned int	tmp,temp;
+   1709          	unsigned short	prev,next;
+   1710          	unsigned int	barcode_hash_prev,barcode_hash_next;
+   1711          	unsigned int	hash_value,link_end;
+   1712          	unsigned char	inf_file_str[35];
+   1713          	unsigned int	node_size;
+   1714          	unsigned int	log_data[8];
+   1715          
+   1716          	//step1:先将该节点标记为无效节点
+   1717          	if (rectype == REC_TYPE_BATCH)
+   1718          	{
+   1719          		strcpy(inf_file_str,batch_dirctory);
+   1720          		strcat(inf_file_str,batch_list_file);
+   1721          		node_size = sizeof(TBATCH_NODE);
+   1722          	}
+   1723          	else
+   1724          	{
+   1725          		return -1;
+   1726          	}
+   1727          
+   1728          	if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   1729          	{
+   1730          		return -2;
+   1731          	}
+   1732          
+   1733          	f_lseek(&file1,(index-1)*node_size);
+   1734          	if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   1735          	{
+   1736          		f_close(&file1);
+   1737          		return -3;
+   1738          	}
+   1739          
+   1740          
+   1741          	((TBATCH_NODE*)buffer)->flag = 0x55;
+   1742          
+   1743          	prev = ((TBATCH_NODE*)buffer)->by_index_prev;
+   1744          	next = ((TBATCH_NODE*)buffer)->by_index_next;
+   1745          
+   1746          	barcode_hash_prev = 0;
+   1747          	barcode_hash_next = 0;
+   1748          	hash_value = 0;
+   1749          
+   1750          	f_lseek(&file1,(index-1)*node_size);
+   1751          	if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   1752          	{
+   1753          		f_close(&file1);
+   1754          		return -4;
+   1755          	}
+   1756          
+   1757          	if (tmp != node_size)
+   1758          	{
+   1759          		f_close(&file1);
+   1760          		return -5;
+   1761          	}
+   1762          
+   1763          	f_sync(&file1);
+   1764          
+   1765          	log_data[0] = OP_TYPE_DEL_NODE;
+   1766          	log_data[1] = rectype;
+   1767          	log_data[2] = index;
+   1768          	log_data[3] = prev;
+   1769          	log_data[4] = next;
+   1770          	log_data[5] = barcode_hash_prev;
+   1771          	log_data[6] = barcode_hash_next;
+   1772          	log_data[7] = hash_value;
+   1773          	log_len = 0;
+   1774          	if (save_log_file((void*)log_data,32))
+   1775          	{
+   1776          		return -6;
+   1777          	}
+   1778          
+   1779          	//step2:更新该节点前一个节点和后一个节点的链表信息
+   1780          	if(prev)
+   1781          	{
+   1782          		f_lseek(&file1,(prev-1)*node_size);
+   1783          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   1784          		{
+   1785          			f_close(&file1);
+   1786          			return -7;
+   1787          		}
+   1788          
+   1789          
+   1790          		((TBATCH_NODE*)buffer)->by_index_next = next;
+   1791          
+   1792          		calc_check_value(rectype,buffer);
+   1793          
+   1794          		f_lseek(&file1,(prev-1)*node_size);
+   1795          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   1796          		{
+   1797          			f_close(&file1);
+   1798          			return -8;
+   1799          		}
+   1800          
+   1801          		if (tmp != node_size)
+   1802          		{
+   1803          			f_close(&file1);
+   1804          			return -9;
+   1805          		}
+   1806          
+   1807          		f_sync(&file1);
+   1808          	}
+   1809          
+   1810          	if (next)
+   1811          	{
+   1812          		f_lseek(&file1,(next-1)*node_size);
+   1813          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   1814          		{
+   1815          			f_close(&file1);
+   1816          			return -10;
+   1817          		}
+   1818          
+   1819          
+   1820          		((TBATCH_NODE*)buffer)->by_index_prev = prev;
+   1821          
+   1822          		calc_check_value(rectype,buffer);
+   1823          		f_lseek(&file1,(next-1)*node_size);
+   1824          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   1825          		{
+   1826          			f_close(&file1);
+   1827          			return -11;
+   1828          		}
+   1829          
+   1830          		if (tmp != node_size)
+   1831          		{
+   1832          			f_close(&file1);
+   1833          			return -12;
+   1834          		}
+   1835          
+   1836          		f_sync(&file1);
+   1837          	}
+   1838          
+   1839          	//可以将节点文件关闭了
+   1840          	f_close(&file1);
+   1841          
+   1842          	//step3:将删除的节点的偏移记录在信息文件中
+   1843          
+   1844          	strcpy(inf_file_str,batch_dirctory);
+   1845          	strcat(inf_file_str,batch_inf_file);
+   1846          
+   1847          	if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   1848          	{
+   1849          		return -19;
+   1850          	}
+   1851          
+   1852          	f_lseek(&file1,file1.fsize);
+   1853          	if (f_write(&file1,(void*)&index,4,&tmp) != FR_OK)
+   1854          	{
+   1855          		f_close(&file1);
+   1856          		return -20;
+   1857          	}
+   1858          
+   1859          	if (tmp != 4)
+   1860          	{
+   1861          		f_close(&file1);
+   1862          		return -21;
+   1863          	}
+   1864          
+   1865          	f_sync(&file1);
+   1866          
+   1867          	//如果删除的节点是链表的首节点，那么还需要更新保存的链表首节点信息
+   1868          	f_lseek(&file1,4);
+   1869          	if ((f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)||(tmp != 4))
+   1870          	{
+   1871          		f_close(&file1);
+   1872          		return -22;
+   1873          	}
+   1874          
+   1875          	if (temp == index)
+   1876          	{
+   1877          		f_lseek(&file1,4);
+   1878          		temp = next;
+   1879          		if (f_write(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   1880          		{
+   1881          			f_close(&file1);
+   1882          			return -23;
+   1883          		}
+   1884          
+   1885          		if (tmp != 4)
+   1886          		{
+   1887          			f_close(&file1);
+   1888          			return -24;
+   1889          		}
+   1890          
+   1891          		f_sync(&file1);
+   1892          	}
+   1893          
+   1894          	//如果删除的节点是链表的尾节点，那么还需要更新保存的链表尾节点信息
+   1895          	f_lseek(&file1,8);
+   1896          	if ((f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)||(tmp != 4))
+   1897          	{
+   1898          		f_close(&file1);
+   1899          		return -25;
+   1900          	}
+   1901          
+   1902          	if (temp == index)
+   1903          	{
+   1904          		f_lseek(&file1,8);
+   1905          		temp = prev;
+   1906          		if (f_write(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   1907          		{
+   1908          			f_close(&file1);
+   1909          			return -26;
+   1910          		}
+   1911          
+   1912          		if (tmp != 4)
+   1913          		{
+   1914          			f_close(&file1);
+   1915          			return -27;
+   1916          		}
+   1917          	}
+   1918          
+   1919          	f_close(&file1);
+   1920          
+   1921          	clear_log_file(0);		//清除日志
+   1922          
+   1923          	return 0;
+   1924          }
+   1925          
+   1926          #if 0
+   1927          /**
+   1928          * @brief 读取序列号节点
+   1929          * @param[in] unsigned int mode  0:第一个有效节点   1;前一个有效节点   2:后一个有效节点  3:指定节点偏移
+   1930          * @param[in] unsigned int offset  只有在mode = 3时才有用
+   1931          */
+   1932          unsigned char* get_node(unsigned char rectype,unsigned int mode,unsigned int offset)
+   1933          {
+   1934          	unsigned int	node_offset,tmp;
+   1935          	unsigned char	*pRec = 0;
+   1936          	unsigned char   inf_file_str[35];
+   1937          	if (mode == 0)
+   1938          	{
+   1939          		current_node_offset = 0;
+   1940          		if (rectype == REC_TYPE_SERIAL_LIST)
+   1941          		{
+   1942          			strcpy(inf_file_str,serial_data_dirctory);
+   1943          			strcat(inf_file_str,current_dj_dir);
+   1944          			strcat(inf_file_str,serial_data_info_file);
+   1945          		}
+   1946          		else if (rectype == REC_TYPE_MULTCHK_LIST)
+   1947          		{
+   1948          			strcpy(inf_file_str,multi_check_dirctory);
+   1949          			strcat(inf_file_str,multchk_data_info_file);
+   1950          		}
+   1951          		else if (rectype == REC_TYPE_MULTXLH_LIST)
+   1952          		{
+   1953          			strcpy(inf_file_str,serial_data_dirctory);
+   1954          			strcat(inf_file_str,multxlh_data_info_file);
+   1955          		}
+   1956          		else
+   1957          		{
+   1958          			strcpy(inf_file_str,wireless_bargun_dirctory);
+   1959          			strcat(inf_file_str,bargun_data_info_file);
+   1960          		}
+   1961          
+   1962          		if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   1963          		{
+   1964          			return (unsigned char*)0;
+   1965          		}
+   1966          
+   1967          		f_lseek(&file1,8);
+   1968          		if ((f_read(&file1,(void*)&node_offset,4,&tmp) != FR_OK)||(tmp != 4))
+   1969          		{
+   1970          			f_close(&file1);
+   1971          			return (unsigned char*)0;
+   1972          		}
+   1973          
+   1974          		f_close(&file1);
+   1975          	}
+   1976          	else if (1 == mode)
+   1977          	{
+   1978          		node_offset = next_node_offset;
+   1979          	}
+   1980          	else if (2 == mode)
+   1981          	{
+   1982          		node_offset = prev_node_offset;
+   1983          	}
+   1984          	else if(3 == mode)
+   1985          	{
+   1986          		node_offset = offset;
+   1987          	}
+   1988          	else
+   1989          	{
+   1990          		return (unsigned char*)0;
+   1991          	}
+   1992          
+   1993          	if (node_offset)
+   1994          	{
+   1995          		current_node_offset = node_offset;
+   1996          		if (rectype == REC_TYPE_SERIAL_LIST)
+   1997          		{
+   1998          			pRec = record_module_read(REC_TYPE_SERIAL_LIST,current_node_offset);
+   1999          			prev_node_offset = ((SERIAL_DATA_NODE*)pRec)->by_index_prev;
+   2000          			next_node_offset = ((SERIAL_DATA_NODE*)pRec)->by_index_next;
+   2001          		}
+   2002          		else if (rectype == REC_TYPE_MULTCHK_LIST)
+   2003          		{
+   2004          			pRec = record_module_read(REC_TYPE_MULTCHK_LIST,current_node_offset);
+   2005          			prev_node_offset = ((MULTCHK_NAME*)pRec)->prev;
+   2006          			next_node_offset = ((MULTCHK_NAME*)pRec)->next;
+   2007          		}
+   2008          		else if (rectype == REC_TYPE_MULTXLH_LIST)
+   2009          		{
+   2010          			pRec = record_module_read(REC_TYPE_MULTXLH_LIST,current_node_offset);
+   2011          			prev_node_offset = ((MULTXLH_NAME*)pRec)->prev;
+   2012          			next_node_offset = ((MULTXLH_NAME*)pRec)->next;
+   2013          		}
+   2014          		else
+   2015          		{
+   2016          			pRec = record_module_read(REC_TYPE_BARGUN,current_node_offset);
+   2017          			prev_node_offset = ((TBARGUN_DATA_NODE*)pRec)->by_index_prev;
+   2018          			next_node_offset = ((TBARGUN_DATA_NODE*)pRec)->by_index_next;
+   2019          		}
+   2020          
+   2021          	}
+   2022          
+   2023          	return pRec;
+   2024          }
+   2025          
+   2026          /**
+   2027          * @brief 获取序列号节点文件中物理偏移对应的逻辑偏移
+   2028          * @param[in] unsigned int	physical_index
+   2029          */
+   2030          unsigned int serail_data_PA_to_LA(unsigned int physical_index)
+   2031          {
+   2032          	unsigned int	node_offset,tmp;
+   2033          	unsigned char   inf_file_str[35];
+   2034          	unsigned char	*pRec;
+   2035          	unsigned int	logical_index = 1;
+   2036          
+   2037          	strcpy(inf_file_str,serial_data_dirctory);
+   2038          	strcat(inf_file_str,current_dj_dir);
+   2039          	strcat(inf_file_str,serial_data_info_file);
+   2040          
+   2041          
+   2042          	if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   2043          	{
+   2044          		return 0;
+   2045          	}
+   2046          
+   2047          	f_lseek(&file1,4);
+   2048          	if ((f_read(&file1,(void*)&node_offset,4,&tmp) != FR_OK)||(tmp != 4))
+   2049          	{
+   2050          		f_close(&file1);
+   2051          		return 0;
+   2052          	}
+   2053          
+   2054          	f_close(&file1);
+   2055          
+   2056          	while(node_offset != physical_index)
+   2057          	{
+   2058          		pRec = record_module_read(REC_TYPE_SERIAL_LIST,node_offset);
+   2059          		if (pRec)
+   2060          		{
+   2061          			node_offset = ((SERIAL_DATA_NODE*)pRec)->by_index_next;
+   2062          			if (node_offset == 0)
+   2063          			{
+   2064          				return 0;
+   2065          			}
+   2066          		}
+   2067          		else
+   2068          		{
+   2069          			return 0;
+   2070          		}
+   2071          
+   2072          		logical_index++;
+   2073          	}
+   2074          
+   2075          	return logical_index;
+   2076          }
+   2077          #endif
+   2078          /**
+   2079          * @brief 获取某一个文件的大小
+   2080          * @param[in] const unsigned char *dir		文件的路径
+   2081          */
+   2082          int get_file_size(const unsigned char *dir)
+   2083          {
+   2084          	int size;
+   2085          	if (f_open(&file1,dir,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   2086          	{
+   2087          		return 0;
+   2088          	}
+   2089          
+   2090          	size = file1.fsize;
+   2091          
+   2092          	f_close(&file1);
+   2093          
+   2094          	return size;
+   2095          }
+   2096          
+   2097          /**
+   2098          * @brief 读取记录文件夹中的某一个文件
+   2099          * @param[in] const unsigned char *dir		文件的路径
+   2100          * @param[in] unsigned int	 offset			文件偏移
+   2101          * @param[in] unsigned int	 len			数据长度
+   2102          * @param[in] unsigned char *pdata			数据指针
+   2103          * @return  < 0		读取文件失败
+   2104          *          >= 0		读取成功,返回读取数据的实际长度
+   2105          */
+   2106          int read_rec_file(const unsigned char *dir,unsigned int offset,unsigned int len,unsigned char *pdata)
+   2107          {
+   2108          	int	tmp;
+   2109          
+   2110          	if (f_open(&file1,dir,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   2111          	{
+   2112          		return -1;
+   2113          	}
+   2114          
+   2115          	if(file1.fsize < offset)
+   2116          	{
+   2117          		f_close(&file1);
+   2118          		return -2;
+   2119          	}
+   2120          
+   2121          	f_lseek(&file1,offset);
+   2122          	if (f_read(&file1,pdata,len,&tmp) != FR_OK)
+   2123          	{
+   2124          		f_close(&file1);
+   2125          		return -3;
+   2126          	}
+   2127          
+   2128          	f_close(&file1);
+   2129          	return tmp;
+   2130          }
+   2131          
+   2132          /**
+   2133          * @brief 往记录文件夹中的某一个文件写入数据
+   2134          * @param[in] const unsigned char *dir		文件的路径
+   2135          * @param[in] unsigned int	 offset			文件偏移
+   2136          * @param[in] unsigned int	 len			数据长度
+   2137          * @param[in] unsigned char *pdata			数据指针
+   2138          * @return  < 0		写入文件失败
+   2139          *          >= 0		写入成功,返回写入数据的实际长度
+   2140          */
+   2141          int write_rec_file(const unsigned char *dir,unsigned int offset,unsigned int len,unsigned char *pdata)
+   2142          {
+   2143          	int	tmp;
+   2144          
+   2145          	if (f_open(&file1,dir,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+   2146          	{
+   2147          		return -1;
+   2148          	}
+   2149          
+   2150          	if(file1.fsize < offset)
+   2151          	{
+   2152          		f_close(&file1);
+   2153          		return -2;
+   2154          	}
+   2155          
+   2156          	f_lseek(&file1,offset);
+   2157          	if (f_write(&file1,pdata,len,&tmp) != FR_OK)
+   2158          	{
+   2159          		f_close(&file1);
+   2160          		return -3;
+   2161          	}
+   2162          
+   2163          	if (tmp != len)
+   2164          	{
+   2165          		f_close(&file1);
+   2166          		return -3;
+   2167          	}
+   2168          
+   2169          	f_close(&file1);
+   2170          	return tmp;
+   2171          }
+   2172          
+   2173          /**
+   2174          * @brief 检查某一个记录的文件夹中的记录文件是否完整或者合法
+   2175          * @param[in] const unsigned char rectype	记录类型
+   2176          */
+   2177          int check_record_dir(unsigned char rectype)
+   2178          {
+   2179          	const unsigned char	*p_rec_file[4];
+   2180          	const unsigned char *p_rec_dir;
+   2181          	unsigned char dir_str[35];
+   2182          	unsigned int	i,tmp;
+   2183          	int				ret = 0;
+   2184          	unsigned char   tmp_buffer[4];
+   2185          
+   2186          	if (REC_TYPE_GOODS_LIST == rectype)
+   2187          	{
+   2188          		//检查商品信息文件夹中的记录文件
+   2189          		p_rec_dir = goods_list_dirctory;
+   2190          
+   2191          		p_rec_file[0] = barcode_hash_table_file;
+   2192          		p_rec_file[1] = goods_list_file;
+   2193          		p_rec_file[2] = 0;
+   2194          	}
+   2195          	else if (REC_TYPE_CHECK == rectype)
+   2196          	{
+   2197          		p_rec_dir = check_dirctory;
+   2198          		p_rec_file[0] = barcode_hash_table_file;
+   2199          		p_rec_file[1] = check_list_file;
+   2200          		p_rec_file[2] = 0;
+   2201          	}
+   2202          	else
+   2203          	{
+   2204          		return 0;
+   2205          	}
+   2206          
+   2207          	i = 0;
+   2208          	while(p_rec_file[i])
+   2209          	{
+   2210          		strcpy(dir_str,p_rec_dir);
+   2211          		strcat(dir_str,p_rec_file[i]);
+   2212          
+   2213          		if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   2214          		{
+   2215          			//记录文件不存在
+   2216          			return -2;
+   2217          		}
+   2218          
+   2219          		if (REC_TYPE_GOODS_LIST == rectype)
+   2220          		{
+   2221          			if (i==0)
+   2222          			{
+   2223          				if (file1.fsize != 4*HASH_TABLE_SIZE)
+   2224          				{
+   2225          					ret = -3;		//hash表文件大小错误
+   2226          				}
+   2227          			}
+   2228          
+   2229          			if(i == 1)
+   2230          			{
+   2231          				if ((file1.fsize % sizeof(TGOODS_SPEC_RECORD)) != 0)
+   2232          				{
+   2233          					ret = -5;		//商品信息记录文件不能被节点大小整除
+   2234          				}
+   2235          			}
+   2236          		}
+   2237          		else
+   2238          		{
+   2239          			if (i == 0)
+   2240          			{
+   2241          				if (file1.fsize != 4*HASH_TABLE_SIZE)
+   2242          				{
+   2243          					ret = -3;		//hash表文件大小错误
+   2244          				}
+   2245          			}
+   2246          
+   2247          			if (i == 1)
+   2248          			{
+   2249          				if ((file1.fsize % sizeof(TCHECK_INFO_RECORD)) != 0) 
+   2250          				{
+   2251          					ret = -5;
+   2252          				}
+   2253          			}
+   2254          		}
+   2255          
+   2256          		f_close(&file1);
+   2257          
+   2258          		if (ret)
+   2259          		{
+   2260          			return ret;
+   2261          		}
+   2262          		i++;
+   2263          	}
+   2264          
+   2265          	//上面检查完了记录文件夹中记录文件的存在以及每个记录文件的大小是否正确
+   2266          	//还需要检查记录文件与各hash文件之间的关联性是否正确，以及记录文件内部链表的建立是否正确。
+   2267          	//@todo.....
+   2268          
+   2269          	return 0;
+   2270          }
+   2271          
+   2272          
+   2273          /**
+   2274          ***************************************************************************
+   2275          *@brief	校验下载的升级文件是否正确
+   2276          *@param[in] 
+   2277          *@return 
+   2278          *@warning
+   2279          *@see	
+   2280          *@note 
+   2281          ***************************************************************************
+   2282          */
+   2283          int check_updatefile(void)
+   2284          {
+   2285          	UINT							rd;
+   2286          	int								i;
+   2287          	int								j;
+   2288          	unsigned int					code_sector,code_xor,xor;
+   2289          
+   2290          	if( f_open(&file1, "/update.bin", FA_OPEN_EXISTING | FA_READ ) != FR_OK )
+   2291          	{
+   2292          		return -1;
+   2293          	}
+   2294          
+   2295          	if( f_read(&file1, rec_module_buffer, 512, &rd) != FR_OK )
+   2296          	{
+   2297          		f_close(&file1);
+   2298          		return -1;
+   2299          	}
+   2300          
+   2301          	if( rec_module_buffer[0] != 'J' || rec_module_buffer[1] != 'B' || rec_module_buffer[2] != 'L' )
+   2302          	{
+   2303          		f_close(&file1);
+   2304          		return -1;
+   2305          	}
+   2306          
+   2307          	code_sector						= ((TPackHeader*)rec_module_buffer)->length;
+   2308          	code_xor						= ((TPackHeader*)rec_module_buffer)->xor_data;
+   2309          
+   2310          	code_sector						/= 512;
+   2311          	xor								= 0;
+   2312          	for(i=0; i<code_sector; i++)
+   2313          	{
+   2314          		if( f_read(&file1, rec_module_buffer, 512, &rd) != FR_OK )
+   2315          		{
+   2316          			f_close(&file1);
+   2317          			return -1;
+   2318          		}
+   2319          
+   2320          		for(j=0; j<128; j++)
+   2321          		{
+   2322          			xor						^= *((unsigned int*)&rec_module_buffer[j*4]);
+   2323          		}
+   2324          	}
+   2325          
+   2326          	f_close(&file1);
+   2327          
+   2328          	if(xor != code_xor)
+   2329          	{
+   2330          		return -1;
+   2331          	}
+   2332          
+   2333          	return 0;
+   2334          }
+   2335          
+   2336          
+   2337          /**
+   2338          ***************************************************************************
+   2339          *@brief	校验下载的资源文件是否正确
+   2340          *@param[in] 
+   2341          *@return 
+   2342          *@warning
+   2343          *@see	
+   2344          *@note 
+   2345          ***************************************************************************
+   2346          */
+   2347          int check_resdatafile(void)
+   2348          {
+   2349          	UINT							rd;
+   2350          //	int								i;
+   2351          //	int								j;
+   2352          //	unsigned int					code_sector,code_xor,xor;
+   2353          
+   2354          	if( f_open(&file1, "/resdata.tmp", FA_OPEN_EXISTING | FA_READ ) != FR_OK )
+   2355          	{
+   2356          		return -1;
+   2357          	}
+   2358          
+   2359          	if( f_read(&file1, rec_module_buffer, 512, &rd) != FR_OK )
+   2360          	{
+   2361          		f_close(&file1);
+   2362          		return -1;
+   2363          	}
+   2364          
+   2365          	if( rec_module_buffer[0] != 'J' || rec_module_buffer[1] != 'B' || rec_module_buffer[2] != 'L' || rec_module_buffer[3] != '3')
+   2366          	{
+   2367          		f_close(&file1);
+   2368          		return -1;
+   2369          	}
+   2370          
+   2371          	//code_sector					= ((TPackHeader*)rec_module_buffer)->length;
+   2372          	//code_xor						= ((TPackHeader*)rec_module_buffer)->xor_data;
+   2373          
+   2374          	// 资源文件不能超过8M字节
+   2375          	//if( code_sector >= 8 * 1024 * 1024 )
+   2376          	//{
+   2377          	//	f_close(&file1);
+   2378          	//	return -3;
+   2379          	//}
+   2380          
+   2381          	//code_sector						/= 512;
+   2382          	//xor								= 0;
+   2383          	//for(i=0; i<code_sector; i++)
+   2384          	//{
+   2385          	//	if( f_read(&file1, rec_module_buffer, 512, &rd) != FR_OK )
+   2386          	//	{
+   2387          	//		f_close(&file1);
+   2388          	//		return -1;
+   2389          	//	}
+   2390          
+   2391          	//	for(j=0; j<128; j++)
+   2392          	//	{
+   2393          	//		xor						^= *((unsigned int*)&rec_module_buffer[j*4]);
+   2394          	//	}
+   2395          	//}
+   2396          
+   2397          	f_close(&file1);
+   2398          
+   2399          	//if(xor != code_xor)
+   2400          	//{
+   2401          	//	return -1;
+   2402          	//}
+   2403          
+   2404          	return 0;
+   2405          }
+   2406          
+   2407          
+   2408          /**
+   2409          ***************************************************************************
+   2410          *@brief 判断是否有应用升级文件的存在，如果有升级文件存在就删除应用升级文件
+   2411          *@param[in] 
+   2412          *@return 0 删除成功  else; 删除失败
+   2413          *@warning
+   2414          *@see	
+   2415          *@note 
+   2416          ***************************************************************************
+   2417          */
+   2418          int del_update_bin(void)
+   2419          {
+   2420          	if( f_open(&file1, "/update.bin", FA_OPEN_EXISTING | FA_READ ) != FR_OK )
+   2421          	{
+   2422          		return 0;
+   2423          	}
+   2424          
+   2425          	f_close(&file1);
+   2426          
+   2427          	//应用升级文件存在，将升级文件删除
+   2428          	if (f_unlink("/update.bin") != FR_OK)
+   2429          	{
+   2430          		return -1;	//删除旧的资源文件失败
+   2431          	}
+   2432          
+   2433          	return 0;
+   2434          }
+   2435          
+   2436          /**
+   2437          ***************************************************************************
+   2438          *@brief 判断是否有资源升级文件的存在，如果有升级文件存在就删除资源升级文件
+   2439          *@param[in] 
+   2440          *@return 0 删除成功  else; 删除失败
+   2441          *@warning
+   2442          *@see	
+   2443          *@note 
+   2444          ***************************************************************************
+   2445          */
+   2446          int del_resdata_bin(void)
+   2447          {
+   2448          	if( f_open(&file1, "/resdata.tmp", FA_OPEN_EXISTING | FA_READ ) != FR_OK )
+   2449          	{
+   2450          		return 0;
+   2451          	}
+   2452          
+   2453          	f_close(&file1);
+   2454          
+   2455          	//应用升级文件存在，将升级文件删除
+   2456          	if (f_unlink("/resdata.tmp") != FR_OK)
+   2457          	{
+   2458          		return -1;	//删除旧的资源文件失败
+   2459          	}
+   2460          
+   2461          	return 0;
+   2462          }
+   2463          
+   2464          
+   2465          /**
+   2466          * @brief ]恢复hash表的修改，包括恢复相应的节点文件的修改
+   2467          * @param[in]
+   2468          * @return 0:成功
+   2469          *        -1:失败
+   2470          */
+   2471          static int recover_hash_table_modify(unsigned int rectype,unsigned char hash_type,unsigned int hash_value,unsigned int linkend)
+   2472          {
+   2473          		unsigned char	dir_str[35],node_size;
+   2474          		unsigned int	tmp;
+   2475          		unsigned char   buffer[256];
+   2476          
+   2477          		if (REC_TYPE_GOODS_LIST == rectype)
+   2478          		{
+   2479          			if (hash_type == 0)
+   2480          			{
+   2481          				strcpy(dir_str,goods_list_dirctory);
+   2482          				strcat(dir_str,barcode_hash_table_file);
+   2483          			}
+   2484          			//else if (hash_type == 1)
+   2485          			//{
+   2486          			//	strcpy(dir_str,goods_list_dirctory);
+   2487          			//	strcat(dir_str,name_hash_table_file);
+   2488          			//}
+   2489          			else
+   2490          			{
+   2491          				return -1;
+   2492          			}
+   2493          		}
+   2494          		else if (REC_TYPE_CHECK == rectype)
+   2495          		{
+   2496          			if (hash_type == 0)
+   2497          			{
+   2498          				strcpy(dir_str,check_dirctory);
+   2499          				strcat(dir_str,barcode_hash_table_file);
+   2500          			}
+   2501          			else
+   2502          			{
+   2503          				return -1;
+   2504          			}
+   2505          		}
+   2506          		else if (REC_TYPE_BATCH == rectype)
+   2507          		{
+   2508          			if (hash_type == 0)
+   2509          			{
+   2510          				strcpy(dir_str,batch_dirctory);
+   2511          				strcat(dir_str,batch_inf_file);
+   2512          			}
+   2513          			else
+   2514          			{
+   2515          				return -1;
+   2516          			}
+   2517          		}
+   2518          		else 
+   2519          		{
+   2520          			return -1;
+   2521          		}
+   2522          
+   2523          
+   2524          		//打开HashTable文件
+   2525          		if (f_open(&file2,dir_str,FA_OPEN_EXISTING | FA_WRITE | FA_READ) != FR_OK)
+   2526          		{
+   2527          			return -3;
+   2528          		}
+   2529          
+   2530          		f_lseek(&file2,4*(hash_value%HASH_TABLE_SIZE));
+   2531          
+   2532          		if (f_write(&file2,(void*)&linkend,4,&tmp) != FR_OK)
+   2533          		{
+   2534          			f_close(&file2);
+   2535          			return -4;
+   2536          		}
+   2537          
+   2538          		if (tmp != 4)
+   2539          		{
+   2540          			f_close(&file2);
+   2541          			return -4;
+   2542          		}
+   2543          
+   2544          		f_close(&file2);
+   2545          
+   2546          		if(linkend)
+   2547          		{
+   2548          			//打开节点文件
+   2549          			if (REC_TYPE_GOODS_LIST == rectype)
+   2550          			{
+   2551          				strcpy(dir_str,goods_list_dirctory);
+   2552          				strcat(dir_str,goods_list_file);
+   2553          				node_size = sizeof(TGOODS_SPEC_RECORD);
+   2554          			}
+   2555          			else if (REC_TYPE_CHECK == rectype)
+   2556          			{
+   2557          				strcpy(dir_str,check_dirctory);
+   2558          				strcat(dir_str,check_list_file);
+   2559          				node_size = sizeof(TCHECK_INFO_RECORD);
+   2560          			}
+   2561          			else if (REC_TYPE_BATCH == rectype)
+   2562          			{
+   2563          				strcpy(dir_str,batch_dirctory);
+   2564          				strcat(dir_str,batch_list_file);
+   2565          				node_size = sizeof(TBATCH_NODE);
+   2566          			}
+   2567          			
+   2568          
+   2569          			if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_WRITE | FA_READ) != FR_OK)
+   2570          			{
+   2571          				return -3;
+   2572          			}
+   2573          
+   2574          			if(file1.fsize == 0)
+   2575          			{
+   2576          				f_close(&file1);
+   2577          				return 0;
+   2578          			}
+   2579          
+   2580          			f_lseek(&file1,(linkend-1)*node_size);
+   2581          
+   2582          			if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   2583          			{
+   2584          				f_close(&file1);
+   2585          				return -4;
+   2586          			}
+   2587          
+   2588          			if (REC_TYPE_GOODS_LIST == rectype)
+   2589          			{
+   2590          				if (((TGOODS_SPEC_RECORD*)buffer)->by_barcode_next)
+   2591          				{
+   2592          					((TGOODS_SPEC_RECORD*)buffer)->by_barcode_next = 0;
+   2593          				}
+   2594          			}
+   2595          			else if ((REC_TYPE_CHECK == rectype))
+   2596          			{
+   2597          				if (((TCHECK_INFO_RECORD*)buffer)->by_barcode_next)
+   2598          				{
+   2599          					((TCHECK_INFO_RECORD*)buffer)->by_barcode_next = 0;
+   2600          				}
+   2601          
+   2602          			}
+   2603          			else if ((REC_TYPE_BATCH == rectype))
+   2604          			{
+   2605          				if (((TBATCH_NODE*)buffer)->by_index_next)
+   2606          				{
+   2607          					((TBATCH_NODE*)buffer)->by_index_next = 0;
+   2608          				}
+   2609          
+   2610          			}
+   2611          			calc_check_value((unsigned char)rectype,buffer);
+   2612          
+   2613          			f_lseek(&file1,(linkend-1)*node_size);
+   2614          			if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   2615          			{
+   2616          				f_close(&file1);
+   2617          				return -5;
+   2618          			}
+   2619          
+   2620          			if (tmp != node_size)
+   2621          			{
+   2622          				f_close(&file1);
+   2623          				return -5;
+   2624          			}
+   2625          
+   2626          			f_close(&file1);
+   2627          		}
+   2628          
+   2629          		return 0;
+   2630          }
+   2631          
+   2632          
+   2633          
+   2634          /**
+   2635          * @brief 增加记录操作的恢复
+   2636          * @param[in] 
+   2637          * @return 0:成功
+   2638          *        -1:失败
+   2639          */
+   2640          static int record_add_recover(unsigned int rectype,unsigned int rec_offset,unsigned char *log_data,unsigned int log_data_len)
+   2641          {
+   2642          	unsigned char	dir_str[35];
+   2643          	unsigned int	tmp;
+   2644          	unsigned int	hash_value,linkend,check_value;
+   2645          	if (log_data_len < 8)
+   2646          	{
+   2647          		return -1;
+   2648          	}
+   2649          
+   2650          	if (log_data_len == 8)
+   2651          	{
+   2652          		//只是记录了Barcode HashValue和相应链表的尾节点，那么Hashtable和节点文件都有可能已经改变了，将已经改变的恢复为原来的状况
+   2653          		hash_value = *((unsigned int*)(log_data)); 
+   2654          		linkend = *((unsigned int*)(log_data+4));
+   2655          		if (recover_hash_table_modify(rectype,0,hash_value,linkend))
+   2656          		{
+   2657          			return -2;
+   2658          		}
+   2659          		return 0;
+   2660          	}
+   2661          	else
+   2662          	{
+   2663          		if(REC_TYPE_GOODS_LIST == rectype)
+   2664          		{
+   2665          			if (log_data_len == 16)
+   2666          			{
+   2667          				//恢复为原来的状况
+   2668          				hash_value = *((unsigned int*)(log_data)); 
+   2669          				linkend = *((unsigned int*)(log_data+4));
+   2670          				if (recover_hash_table_modify(rectype,0,hash_value,linkend))
+   2671          				{
+   2672          					return -2;
+   2673          				}
+   2674          
+   2675          				hash_value = *((unsigned int*)(log_data+8)); 
+   2676          				linkend = *((unsigned int*)(log_data+12));
+   2677          				if (recover_hash_table_modify(rectype,1,hash_value,linkend))
+   2678          				{
+   2679          					return -3;
+   2680          				}
+   2681          
+   2682          				return 0;
+   2683          			}
+   2684          			else
+   2685          			{
+   2686          				if (REC_TYPE_GOODS_LIST == rectype)
+   2687          				{
+   2688          					if (log_data_len == 16+sizeof(TGOODS_SPEC_RECORD))
+   2689          					{
+   2690          						//可能已经写入了节点数据
+   2691          						strcpy(dir_str,goods_list_dirctory);
+   2692          						strcat(dir_str,goods_list_file);
+   2693          						if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   2694          						{
+   2695          							return -4;
+   2696          						}
+   2697          
+   2698          						if (file1.fsize != rec_offset*sizeof(TGOODS_SPEC_RECORD))
+   2699          						{
+   2700          							//说明实际上没有写入节点
+   2701          							f_lseek(&file1,file1.fsize);
+   2702          							if (f_write(&file1,(void*)(log_data+16),sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+   2703          							{
+   2704          								f_close(&file1);
+   2705          								return -5;
+   2706          							}
+   2707          
+   2708          							if (tmp != sizeof(TGOODS_SPEC_RECORD))
+   2709          							{	
+   2710          								f_close(&file1);
+   2711          								return -5;
+   2712          							}
+   2713          						}
+   2714          						f_close(&file1);
+   2715          						return 0;
+   2716          					}
+   2717          					else
+   2718          					{	
+   2719          						return -2;			//日志数据长度错误
+   2720          					}
+   2721          				}
+   2722          			}
+   2723          		}
+   2724          		else if (rectype == REC_TYPE_CHECK)
+   2725          		{
+   2726          			if (log_data_len == 8+sizeof(TCHECK_INFO_RECORD))
+   2727          			{
+   2728          				//可能已经写入了节点数据
+   2729          
+   2730          				strcpy(dir_str,check_dirctory);
+   2731          				strcat(dir_str,check_list_file);
+   2732          				if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   2733          				{
+   2734          					return -4;
+   2735          				}
+   2736          
+   2737          				if (file1.fsize != rec_offset*sizeof(TCHECK_INFO_RECORD))
+   2738          				{
+   2739          					//说明实际上没有写入节点
+   2740          					f_lseek(&file1,file1.fsize);
+   2741          					if (f_write(&file1,(void*)(log_data+8),sizeof(TCHECK_INFO_RECORD),&tmp) != FR_OK)
+   2742          					{
+   2743          						f_close(&file1);
+   2744          						return -5;
+   2745          					}
+   2746          
+   2747          					if (tmp != sizeof(TCHECK_INFO_RECORD))
+   2748          					{	
+   2749          						f_close(&file1);
+   2750          						return -5;
+   2751          					}
+   2752          				}
+   2753          
+   2754          				f_close(&file1);
+   2755          				return 0;
+   2756          			}
+   2757          			else
+   2758          			{
+   2759          				return -2;		//日志数据长度错误
+   2760          			}
+   2761          		}
+   2762          		else if (rectype == REC_TYPE_BATCH)
+   2763          		{
+   2764          			if (log_data_len == 8+sizeof(TBATCH_NODE))
+   2765          			{
+   2766          				//可能已经写入了节点数据
+   2767          
+   2768          				strcpy(dir_str,batch_dirctory);
+   2769          				strcat(dir_str,batch_list_file);
+   2770          				if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   2771          				{
+   2772          					return -4;
+   2773          				}
+   2774          
+   2775          				if (file1.fsize != rec_offset*sizeof(TBATCH_NODE))
+   2776          				{
+   2777          					//说明实际上没有写入节点
+   2778          					f_lseek(&file1,file1.fsize);
+   2779          					if (f_write(&file1,(void*)(log_data+8),sizeof(TBATCH_NODE),&tmp) != FR_OK)
+   2780          					{
+   2781          						f_close(&file1);
+   2782          						return -5;
+   2783          					}
+   2784          
+   2785          					if (tmp != sizeof(TBATCH_NODE))
+   2786          					{	
+   2787          						f_close(&file1);
+   2788          						return -5;
+   2789          					}
+   2790          				}
+   2791          
+   2792          				f_close(&file1);
+   2793          				return 0;
+   2794          			}
+   2795          			else
+   2796          			{
+   2797          				return -2;		//日志数据长度错误
+   2798          			}
+   2799          		}
+   2800          	}
+   2801          
+   2802          	return -1;
+   2803          }
+   2804          
+   2805          
+   2806          
+   2807          /**
+   2808          * @brief 恢复被中断的清除所有记录操作
+   2809          * @return 0：成功  -1：失败
+   2810          */
+   2811          int record_clear_recover(unsigned int rectype)
+   2812          {
+   2813          	unsigned char dir_str[35];
+   2814          	unsigned char dir_tmp[35];
+   2815          	const unsigned char	*p_hash_table_file[3];
+   2816          	const unsigned char	*target_dir;
+   2817          	int i;
+   2818          
+   2819          	if (rectype == REC_TYPE_GOODS_LIST)
+   2820          	{
+   2821          		target_dir = goods_list_dirctory;
+   2822          
+   2823          		p_hash_table_file[0] = barcode_hash_table_file;
+   2824          		p_hash_table_file[1] = 0;
+   2825          	}
+   2826          	else if (rectype == REC_TYPE_CHECK)
+   2827          	{
+   2828          		target_dir = check_dirctory;
+   2829          		p_hash_table_file[0] = barcode_hash_table_file;
+   2830          		p_hash_table_file[1] = 0;
+   2831          	}
+   2832          	else if (rectype == REC_TYPE_BATCH)
+   2833          	{
+   2834          		target_dir = batch_dirctory;
+   2835          		p_hash_table_file[0] = batch_inf_file;
+   2836          		p_hash_table_file[1] = 0;
+   2837          	}
+   2838          	else
+   2839          	{
+   2840          		return 0;
+   2841          	}
+   2842          
+   2843          	i = 0;
+   2844          	while (p_hash_table_file[i])
+   2845          	{
+   2846          		strcpy(dir_str,target_dir);
+   2847          		strcat(dir_str,p_hash_table_file[i]);
+   2848          
+   2849          		//打开相应的hash_table文件
+   2850          		if (f_open(&file2,(const char*)dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   2851          		{
+   2852          			return -3;
+   2853          		}
+   2854          		if (rectype == REC_TYPE_BATCH)
+   2855          		{
+   2856          			init_data_info_file(&file2);	
+   2857          		}
+   2858          		else
+   2859          		{
+   2860          			init_hash_table_file(&file2);	
+   2861          		}
+   2862          		
+   2863          
+   2864          		f_close(&file2);
+   2865          		i++;
+   2866          	}
+   2867          	return 0;
+   2868          }
+   2869          
+   2870          #if 0
+   2871          /**
+   2872          * @brief 恢复被中断的删除某一个节点的操作
+   2873          * @return 0：成功  -1：失败
+   2874          */
+   2875          static int del_one_node_recover(unsigned int rectype,unsigned int index,unsigned int prev,unsigned int next,unsigned int barcode_hash_prev,unsigned int barcode_hash_next,unsigned int hash_value)
+   2876          {
+   2877          	unsigned char	buffer[sizeof(SERIAL_DATA_NODE)];
+   2878          	unsigned int	tmp,temp;
+   2879          	unsigned char	inf_file_str[35];
+   2880          	unsigned int	node_size;
+   2881          
+   2882          	if (rectype == REC_TYPE_SERIAL_LIST)
+   2883          	{
+   2884          		strcpy(inf_file_str,serial_data_dirctory);
+   2885          		strcat(inf_file_str,current_dj_dir);
+   2886          		strcat(inf_file_str,serial_list_file);
+   2887          		node_size = sizeof(SERIAL_DATA_NODE);
+   2888          	}
+   2889          	else if (rectype == REC_TYPE_BARGUN)
+   2890          	{
+   2891          		strcpy(inf_file_str,wireless_bargun_dirctory);
+   2892          		strcat(inf_file_str,bargun_data_file);
+   2893          		node_size = sizeof(TBARGUN_DATA_NODE);
+   2894          	}
+   2895          	else if (rectype == REC_TYPE_MULTCHK_LIST)
+   2896          	{
+   2897          		strcpy(inf_file_str,multi_check_dirctory);
+   2898          		strcat(inf_file_str,multchk_list_file);
+   2899          		node_size = sizeof(MULTCHK_NAME);
+   2900          	}
+   2901          	else if (rectype == REC_TYPE_MULTCHK_LIST)
+   2902          	{
+   2903          		strcpy(inf_file_str,serial_data_dirctory);
+   2904          		strcat(inf_file_str,multxlh_list_file);
+   2905          		node_size = sizeof(MULTXLH_NAME);
+   2906          	}
+   2907          	else
+   2908          	{
+   2909          		return -1;
+   2910          	}
+   2911          
+   2912          	//step2:更新该节点前一个节点和后一个节点的链表信息
+   2913          	if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   2914          	{
+   2915          		return -2;
+   2916          	}
+   2917          
+   2918          	if(prev)
+   2919          	{
+   2920          		f_lseek(&file1,(prev-1)*node_size);
+   2921          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   2922          		{
+   2923          			f_close(&file1);
+   2924          			return -4;
+   2925          		}
+   2926          
+   2927          		if (rectype == REC_TYPE_SERIAL_LIST)
+   2928          		{
+   2929          			((SERIAL_DATA_NODE*)buffer)->by_index_next = next;
+   2930          		}
+   2931          		else if(rectype == REC_TYPE_MULTCHK_LIST)
+   2932          		{
+   2933          			((MULTCHK_NAME*)buffer)->next = next;
+   2934          		}
+   2935          		else if(rectype == REC_TYPE_MULTXLH_LIST)
+   2936          		{
+   2937          			((MULTXLH_NAME*)buffer)->next = next;
+   2938          		}
+   2939          		else //if(rectype == REC_TYPE_BARGUN)
+   2940          		{
+   2941          			((TBARGUN_DATA_NODE*)buffer)->by_index_next = next;
+   2942          		}
+   2943          		
+   2944          
+   2945          
+   2946          		calc_check_value(rectype,buffer);
+   2947          
+   2948          		f_lseek(&file1,(prev-1)*node_size);
+   2949          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   2950          		{
+   2951          			f_close(&file1);
+   2952          			return -5;
+   2953          		}
+   2954          
+   2955          		if (tmp != node_size)
+   2956          		{
+   2957          			f_close(&file1);
+   2958          			return -5;
+   2959          		}
+   2960          	}
+   2961          
+   2962          	if (next)
+   2963          	{
+   2964          		f_lseek(&file1,(next-1)*node_size);
+   2965          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   2966          		{
+   2967          			f_close(&file1);
+   2968          			return -6;
+   2969          		}
+   2970          
+   2971          
+   2972          		if (REC_TYPE_SERIAL_LIST == rectype)
+   2973          		{
+   2974          			((SERIAL_DATA_NODE*)buffer)->by_index_prev = prev;
+   2975          		}
+   2976          		else if(REC_TYPE_MULTCHK_LIST == rectype)
+   2977          		{
+   2978          			((MULTCHK_NAME*)buffer)->prev = prev;
+   2979          		}
+   2980          		else if(REC_TYPE_MULTXLH_LIST == rectype)
+   2981          		{
+   2982          			((MULTXLH_NAME*)buffer)->prev = prev;
+   2983          		}
+   2984          		else //if(rectype == REC_TYPE_BARGUN)
+   2985          		{
+   2986          			((TBARGUN_DATA_NODE*)buffer)->by_index_prev = prev;
+   2987          		}
+   2988          		
+   2989          
+   2990          		calc_check_value(rectype,buffer);
+   2991          		f_lseek(&file1,(next-1)*node_size);
+   2992          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   2993          		{
+   2994          			f_close(&file1);
+   2995          			return -7;
+   2996          		}
+   2997          
+   2998          		if (tmp != node_size)
+   2999          		{
+   3000          			f_close(&file1);
+   3001          			return -7;
+   3002          		}
+   3003          	}
+   3004          
+   3005          	if(barcode_hash_prev)
+   3006          	{
+   3007          		f_lseek(&file1,(barcode_hash_prev-1)*node_size);
+   3008          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   3009          		{
+   3010          			f_close(&file1);
+   3011          			return -4;
+   3012          		}
+   3013          
+   3014          		((SERIAL_DATA_NODE*)buffer)->by_keyproperty_next[0] = barcode_hash_next;
+   3015          
+   3016          		calc_check_value(rectype,buffer);
+   3017          
+   3018          		f_lseek(&file1,(barcode_hash_prev-1)*node_size);
+   3019          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   3020          		{
+   3021          			f_close(&file1);
+   3022          			return -5;
+   3023          		}
+   3024          
+   3025          		if (tmp != node_size)
+   3026          		{
+   3027          			f_close(&file1);
+   3028          			return -5;
+   3029          		}
+   3030          
+   3031          		f_sync(&file1);
+   3032          	}
+   3033          
+   3034          
+   3035          	if (barcode_hash_next)
+   3036          	{
+   3037          		f_lseek(&file1,(barcode_hash_next-1)*node_size);
+   3038          		if ((f_read(&file1,buffer,node_size,&tmp) != FR_OK)||(tmp != node_size))
+   3039          		{
+   3040          			f_close(&file1);
+   3041          			return -6;
+   3042          		}
+   3043          
+   3044          		((SERIAL_DATA_NODE*)buffer)->by_keyproperty_prev[0] = barcode_hash_prev;
+   3045          
+   3046          
+   3047          		calc_check_value(rectype,buffer);
+   3048          		f_lseek(&file1,(barcode_hash_next-1)*node_size);
+   3049          		if (f_write(&file1,buffer,node_size,&tmp) != FR_OK)
+   3050          		{
+   3051          			f_close(&file1);
+   3052          			return -7;
+   3053          		}
+   3054          
+   3055          		if (tmp != node_size)
+   3056          		{
+   3057          			f_close(&file1);
+   3058          			return -7;
+   3059          		}
+   3060          	}
+   3061          
+   3062          
+   3063          	//可以将节点文件关闭了
+   3064          	f_close(&file1);
+   3065          
+   3066          	//step3:将删除的节点的偏移记录在信息文件中
+   3067          	if (rectype == REC_TYPE_SERIAL_LIST)
+   3068          	{
+   3069          		strcpy(inf_file_str,serial_data_dirctory);
+   3070          		strcat(inf_file_str,current_dj_dir);
+   3071          		strcat(inf_file_str,serial_data_info_file);
+   3072          	}
+   3073          	else if (rectype == REC_TYPE_MULTCHK_LIST)
+   3074          	{
+   3075          		strcpy(inf_file_str,multi_check_dirctory);
+   3076          		strcat(inf_file_str,multchk_data_info_file);
+   3077          	}
+   3078          	else if (rectype == REC_TYPE_MULTXLH_LIST)
+   3079          	{
+   3080          		strcpy(inf_file_str,serial_data_dirctory);
+   3081          		strcat(inf_file_str,multxlh_data_info_file);
+   3082          	}
+   3083          	else //if(rectype == REC_TYPE_BARGUN)
+   3084          	{ 
+   3085          		strcpy(inf_file_str,wireless_bargun_dirctory);
+   3086          		strcat(inf_file_str,bargun_data_info_file);
+   3087          	}
+   3088          
+   3089          
+   3090          	if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   3091          	{
+   3092          		return -8;
+   3093          	}
+   3094          
+   3095          	if (file1.fsize > 12)
+   3096          	{
+   3097          		f_lseek(&file1,file1.fsize-4);
+   3098          		if (f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   3099          		{
+   3100          			f_close(&file1);
+   3101          			return -9;
+   3102          		}
+   3103          
+   3104          		if (temp == index)
+   3105          		{
+   3106          			goto check_next;		//说明该删除的节点偏移已经保存在INF文件中了，不需要再保存一次
+   3107          		}
+   3108          	}
+   3109          
+   3110          	f_lseek(&file1,file1.fsize);
+   3111          	if (f_write(&file1,(void*)&index,4,&tmp) != FR_OK)
+   3112          	{
+   3113          		f_close(&file1);
+   3114          		return -9;
+   3115          	}
+   3116          
+   3117          	if (tmp != 4)
+   3118          	{
+   3119          		f_close(&file1);
+   3120          		return -9;
+   3121          	}
+   3122          
+   3123          	f_sync(&file1);
+   3124          
+   3125          check_next:
+   3126          
+   3127          	//如果删除的节点是链表的首节点，那么还需要更新保存的链表首节点信息
+   3128          	f_lseek(&file1,4);
+   3129          	if ((f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)||(tmp != 4))
+   3130          	{
+   3131          		f_close(&file1);
+   3132          		return -10;
+   3133          	}
+   3134          
+   3135          	if (temp == index)
+   3136          	{
+   3137          		f_lseek(&file1,4);
+   3138          		temp = next;
+   3139          		if (f_write(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   3140          		{
+   3141          			f_close(&file1);
+   3142          			return -11;
+   3143          		}
+   3144          
+   3145          		if (tmp != 4)
+   3146          		{
+   3147          			f_close(&file1);
+   3148          			return -11;
+   3149          		}
+   3150          
+   3151          		f_sync(&file1);
+   3152          	}
+   3153          
+   3154          	//如果删除的节点是链表的尾节点，那么还需要更新保存的链表尾节点信息
+   3155          	f_lseek(&file1,8);
+   3156          	if ((f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)||(tmp != 4))
+   3157          	{
+   3158          		f_close(&file1);
+   3159          		return -10;
+   3160          	}
+   3161          
+   3162          	if (temp == index)
+   3163          	{
+   3164          		f_lseek(&file1,8);
+   3165          		temp = prev;
+   3166          		if (f_write(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   3167          		{
+   3168          			f_close(&file1);
+   3169          			return -11;
+   3170          		}
+   3171          
+   3172          		if (tmp != 4)
+   3173          		{
+   3174          			f_close(&file1);
+   3175          			return -11;
+   3176          		}
+   3177          	}
+   3178          
+   3179          	f_close(&file1);
+   3180          
+   3181          	if (rectype == REC_TYPE_SERIAL_LIST)
+   3182          	{
+   3183          		//打开hash表文件，确定该节点是否是对应链表的尾节点，如果是尾节点，还需要更新hash表文件
+   3184          		strcpy(inf_file_str,serial_data_dirctory);
+   3185          		strcat(inf_file_str,current_dj_dir);
+   3186          		strcat(inf_file_str,barcode_hash_table_file);
+   3187          
+   3188          		if (f_open(&file1,inf_file_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   3189          		{
+   3190          			return -12;
+   3191          		}
+   3192          
+   3193          		f_lseek(&file1,4*(hash_value%HASH_TABLE_SIZE));
+   3194          		//获取链表的尾地址
+   3195          		if (f_read(&file1,(void*)&temp,4,&tmp) != FR_OK)
+   3196          		{
+   3197          			f_close(&file1);
+   3198          			return -13;
+   3199          		}
+   3200          
+   3201          		if (temp == index)
+   3202          		{
+   3203          			//如果该节点刚好是对应链表的尾节点，那么需要更新该链表对应的尾节点
+   3204          			f_lseek(&file1,4*(hash_value%HASH_TABLE_SIZE));
+   3205          
+   3206          			if (f_write(&file1,(void*)barcode_hash_prev,4,&tmp) != FR_OK)
+   3207          			{
+   3208          				f_close(&file1);
+   3209          				return -14;
+   3210          			}
+   3211          		}
+   3212          
+   3213          		f_close(&file1);
+   3214          	}
+   3215          
+   3216          	return 0;
+   3217          }
+   3218          #endif
+   3219          
+   3220          static int add_goods_node_ext(FIL* node_file,TGOODS_SPEC_RECORD *p_goods_node,unsigned int key_hashvalue,unsigned int index,unsigned int saved_linkend)
+   3221          {
+   3222          #if 0
+   3223          	unsigned char dir_str[35];
+   3224          	unsigned int		  target_offset,link_end,tmp;
+   3225          
+   3226          	strcpy(dir_str,goods_list_dirctory);
+   3227          	strcat(dir_str,name_hash_table_file);
+   3228          	target_offset = 4*(key_hashvalue%HASH_TABLE_SIZE);
+   3229          
+   3230          	if (f_open(&file2,dir_str,FA_OPEN_EXISTING | FA_READ | FA_WRITE) != FR_OK)
+   3231          	{
+   3232          		return -2;
+   3233          	}
+   3234          
+   3235          	f_lseek(&file2,target_offset);
+   3236          	//获取链表的尾地址
+   3237          	if (f_read(&file2,(void*)&link_end,4,&tmp) != FR_OK)
+   3238          	{
+   3239          		return -3;
+   3240          	}
+   3241          
+   3242          	//更新链表的尾地址
+   3243          	f_lseek(&file2,target_offset);
+   3244          	if (f_write(&file2,(void*)&index,4,&tmp) != FR_OK)
+   3245          	{
+   3246          		return -4;
+   3247          	}
+   3248          
+   3249          	if (tmp != 4)
+   3250          	{
+   3251          		return -4;
+   3252          	}
+   3253          
+   3254          	f_sync(&file2);
+   3255          
+   3256          	if (link_end == 0)
+   3257          	{
+   3258          		//如果链表的尾地址为0
+   3259          		p_goods_node->by_keyspec_next[1] = 0;
+   3260          		p_goods_node->by_keyspec_prev[1] = 0;
+   3261          		f_close(&file2);
+   3262          	}
+   3263          	else
+   3264          	{
+   3265          		f_close(&file2);
+   3266          		if (link_end != index)
+   3267          		{
+   3268          			if(update_link_info_after_addNode(node_file,(unsigned char*)p_goods_node,1,2,link_end,index))
+   3269          			{
+   3270          				return -5;
+   3271          			}
+   3272          		}
+   3273          		else
+   3274          		{
+   3275          			if(update_link_info_after_addNode(node_file,(unsigned char*)p_goods_node,1,2,saved_linkend,index))
+   3276          			{
+   3277          				return -5;
+   3278          			}
+   3279          		}
+   3280          	}
+   3281          
+   3282          	return 0;
+   3283          #endif
+   3284          }
+   3285          
+   3286          /**
+   3287          * @brief 恢复被中断的替换商品信息节点的操作
+   3288          * @return 0：成功  -1：失败
+   3289          */
+   3290          static int goods_node_replace_recover(unsigned int index,unsigned int old_hashvalue,unsigned int new_hashvalue,unsigned int saved_linkend,void* p_node)
+   3291          {
+   3292          	unsigned char		dir_str[35];
+   3293          	unsigned int		tmp;
+   3294          
+   3295          	strcpy(dir_str,goods_list_dirctory);
+   3296          	strcat(dir_str,goods_list_file);
+   3297          
+   3298          	if (f_open(&file1,(const char*)dir_str,FA_OPEN_EXISTING | FA_WRITE | FA_READ) != FR_OK)
+   3299          	{
+   3300          		return -1;
+   3301          	}
+   3302          
+   3303          	if(delete_goods_node(&file1,2,(TGOODS_SPEC_RECORD*)p_node,old_hashvalue))
+   3304          	{
+   3305          		f_close(&file1);
+   3306          		return -2;
+   3307          	}
+   3308          
+   3309          	if (add_goods_node_ext(&file1,(TGOODS_SPEC_RECORD*)p_node,new_hashvalue,index,saved_linkend))
+   3310          	{
+   3311          		f_close(&file1);
+   3312          		return -3;
+   3313          	}
+   3314          
+   3315          	calc_check_value(REC_TYPE_GOODS_LIST,p_node);
+   3316          	f_lseek(&file1,(index - 1)*sizeof(TGOODS_SPEC_RECORD));
+   3317          
+   3318          	if (f_write(&file1,p_node,sizeof(TGOODS_SPEC_RECORD),&tmp) != FR_OK)
+   3319          	{
+   3320          		f_close(&file1);
+   3321          		return -3;
+   3322          	}
+   3323          
+   3324          	if (tmp != sizeof(TGOODS_SPEC_RECORD))
+   3325          	{
+   3326          		f_close(&file1);
+   3327          		return -3;
+   3328          	}
+   3329          
+   3330          	f_close(&file1);
+   3331          }
+   3332          
+   3333          /**
+   3334          * @brief 记录操作的恢复
+   3335          * @param[in] unsigned char *precord 记录指针
+   3336          * @return 0:成功
+   3337          *        -1:失败
+   3338          */
+   3339          static int record_recover(unsigned char *log_data,unsigned int log_data_len)
+   3340          {
+   3341          	unsigned int	op_type,rec_type,rec_offset,prev,next,saved_linkend;
+   3342          	unsigned int	barcode_hash_prev,barcode_hash_next;
+   3343          
+   3344          	op_type = *((unsigned int*)log_data);
+   3345          
+   3346          	if (OP_TYPE_ADD_NODE == op_type)
+   3347          	{
+   3348          		if (log_data_len < 12)
+   3349          		{
+   3350          			return -2;		//日志数据长度错误
+   3351          		}
+   3352          
+   3353          		rec_type = *((unsigned int*)(log_data+4));
+   3354          		rec_offset = *((unsigned int*)(log_data+8));
+   3355          
+   3356          		if (log_data_len == 12)
+   3357          		{
+   3358          			//如果日志数据只有12字节，那么说明在增加记录时还没有对原来的记录文件做任何的变动，所以不需要任何的处理
+   3359          			return 0;
+   3360          		}
+   3361          
+   3362          		//说明在记录增加过程中可能已经改变了部分记录数据，需要采取恢复措施
+   3363          		if (record_add_recover(rec_type,rec_offset,log_data+12,log_data_len-12))
+   3364          		{
+   3365          			return -3;
+   3366          		}
+   3367          	}
+   3368          	else if (OP_TYPE_CLEAR_NODE == op_type)
+   3369          	{
+   3370          		if ((log_data_len == 8)||(log_data_len == 12))
+   3371          		{
+   3372          			rec_type = *((unsigned int*)(log_data+4));
+   3373          
+   3374          			if (record_clear_recover(rec_type))
+   3375          			{
+   3376          				return -3;
+   3377          			}
+   3378          		}
+   3379          		else
+   3380          		{
+   3381          			return -2;	//日志数据长度错误
+   3382          		}
+   3383          	}
+   3384          	else if (OP_TYPE_DEL_NODE == op_type)
+   3385          	{
+   3386          		//if ((log_data_len == 32)||(log_data_len == 36))
+   3387          		//{
+   3388          		//	rec_type = *((unsigned int*)(log_data+4));
+   3389          		//	rec_offset = *((unsigned int*)(log_data+8));
+   3390          		//	prev = *((unsigned int*)(log_data+12));
+   3391          		//	next = *((unsigned int*)(log_data+16));
+   3392          		//	barcode_hash_prev = *((unsigned int*)(log_data+20));
+   3393          		//	barcode_hash_next = *((unsigned int*)(log_data+24));
+   3394          		//	saved_linkend = *((unsigned int*)(log_data+28));
+   3395          		//	if (del_one_node_recover(rec_type,rec_offset,prev,next,barcode_hash_prev,barcode_hash_next,saved_linkend))
+   3396          		//	{
+   3397          		//		return -3;
+   3398          		//	}
+   3399          		//}
+   3400          		//else
+   3401          		//{
+   3402          		//	return -2;	//日志数据长度错误
+   3403          		//}
+   3404          
+   3405          	}
+   3406          	else if (OP_TYPE_REPLACE_NODE == op_type)
+   3407          	{
+   3408          		if (log_data_len == 24+sizeof(TGOODS_SPEC_RECORD))
+   3409          		{
+   3410          			rec_type = *((unsigned int*)(log_data+4));
+   3411          			rec_offset = *((unsigned int*)(log_data+8));
+   3412          			prev = *((unsigned int*)(log_data+12));
+   3413          			next = *((unsigned int*)(log_data+16));
+   3414          			saved_linkend = *((unsigned int*)(log_data+20));
+   3415          			
+   3416          			if (rec_type != REC_TYPE_GOODS_LIST)
+   3417          			{
+   3418          				return -2;				//日志数据错误
+   3419          			}
+   3420          
+   3421          			if (goods_node_replace_recover(rec_offset,prev,next,saved_linkend,(void*)(log_data+24)))
+   3422          			{
+   3423          				return -3;
+   3424          			}
+   3425          		}
+   3426          		else if (log_data_len == 24)
+   3427          		{
+   3428          			return 0;
+   3429          		}
+   3430          		else
+   3431          		{
+   3432          			return -2;	//日志数据长度错误
+   3433          		}
+   3434          	}
+   3435          	//else
+   3436          	//{
+   3437          	//	return -1;
+   3438          	//}
+   3439          
+   3440          	return 0;
+   3441          }
+   3442          
+   3443          
+   3444          /**
+   3445          ***************************************************************************
+   3446          *@brief 判断是否存在日志文件，如果有日志文件试图根据日志文件恢复被中断的操作或者回滚被中断的操作
+   3447          *@param[in] 
+   3448          *@return 0 成功  else; 失败
+   3449          ***************************************************************************
+   3450          */
+   3451          int recover_record_by_logfile(void)
+   3452          {
+   3453          	unsigned int	logfile_len,offset,logitem_len;
+   3454          	int				tmp;
+   3455          	int				err_code = 0;
+   3456          	unsigned char	log_bufffer[256];
+   3457          
+   3458          	if (f_open(&file3,log_file,FA_OPEN_ALWAYS | FA_READ | FA_WRITE) != FR_OK)
+   3459          	{
+   3460          		return -1;
+   3461          	}
+   3462          	
+   3463          	logfile_len = file3.fsize;	//日志文件的长度
+   3464          	offset = 0;
+   3465          	while(logfile_len)
+   3466          	{
+   3467          		f_lseek(&file3,offset);
+   3468          		if (f_read(&file3,(void*)&logitem_len,4,&tmp) != FR_OK)
+   3469          		{
+   3470          			err_code = -2;
+   3471          			break;
+   3472          		}
+   3473          
+   3474          		if (tmp != 4)
+   3475          		{
+   3476          			err_code = -2;
+   3477          			break;
+   3478          		}
+   3479          
+   3480          		//if ((logitem_len <= 4)||(logitem_len > 256))
+   3481          		//{
+   3482          		//	err_code = -3;
+   3483          		//	if (logitem_len == 0)	//碰到一种情况，log文件本身大小为24字节，但是内容全部为0，怀疑是写log文件自身时断电造成的
+   3484          		//	{
+   3485          		//		err_code = 0;		
+   3486          		//	}
+   3487          		//	break;
+   3488          		//}
+   3489          
+   3490          		if (logitem_len != logfile_len)
+   3491          		{
+   3492          			err_code = 0;		//出现这种情况认为是在写LOG文件本身断电造成的
+   3493          			break;
+   3494          		}
+   3495          
+   3496          		if (f_read(&file3,(void*)log_bufffer,logitem_len-4,&tmp) != FR_OK)
+   3497          		{
+   3498          			err_code = -4;
+   3499          			break;
+   3500          		}
+   3501          
+   3502          		if (tmp != logitem_len-4)
+   3503          		{
+   3504          			err_code = -4;
+   3505          			break;
+   3506          		}
+   3507          
+   3508          		if (record_recover(log_bufffer,logitem_len-4))
+   3509          		{
+   3510          			err_code = -5;
+   3511          			break;
+   3512          		}
+   3513          
+   3514          		offset += logitem_len;
+   3515          		logfile_len -= logitem_len;
+   3516          	}
+   3517          
+   3518          	if (err_code == 0)
+   3519          	{
+   3520          		f_lseek(&file3,0);
+   3521          		f_truncate(&file3);		//清除日志文件
+   3522          	}
+   3523          
+   3524          	f_close(&file3);
+   3525          	return err_code;
+   3526          }
+   3527          
+   3528          /**
+   3529          ***************************************************************************
+   3530          *@brief 检查数据库文件是否存在
+   3531          ***************************************************************************
+   3532          */
+   3533          int check_database(void)
+   3534          {
+   3535          	unsigned char		dir_str[35];
+   3536          
+   3537          	strcpy(dir_str,goods_list_dirctory);
+   3538          	strcat(dir_str,goods_list_file);
+   3539          
+   3540          	if (f_open(&file2,dir_str,FA_READ | FA_OPEN_EXISTING) != FR_OK)
+   3541          	{
+   3542          		return -1;
+   3543          	}
+   3544          
+   3545          	if (file2.fsize == 0)
+   3546          	{
+   3547          		return -2;
+   3548          	}
+   3549          
+   3550          	f_close(&file2);
+   3551          
+   3552          	strcpy(dir_str,goods_list_dirctory);
+   3553          	strcat(dir_str,barcode_hash_table_file);
+   3554          
+   3555          	if (f_open(&file2,dir_str,FA_READ | FA_OPEN_EXISTING) != FR_OK)
+   3556          	{
+   3557          		return -3;
+   3558          	}
+   3559          
+   3560          	if (file2.fsize !=  HASH_TABLE_SIZE*4)
+   3561          	{
+   3562          		return -4;
+   3563          	}
+   3564          
+   3565          	f_close(&file2);
+   3566          
+   3567          	return 0;
+   3568          }
+   3569          
+   3570          /**
+   3571          ***************************************************************************
+   3572          *@brief 单据搜索功能
+   3573          *@param[in] unsigned char mode   低半字节  0: 完全匹配且只要匹配到一个就返回    1:部分匹配，且需要将匹配的单据索引返回
+   3574          *								 高半字节  0: 表示搜索的是盘点单据				1:表示搜索的是序列号的单据
+   3575          *@param[in] unsigned char *key_str  需要匹配的字符串
+   3576          *@param[out] unsigned char *result_offset_buf  搜索到的单据偏移都按照搜到的先后顺序存放在此Buffer中，调用此函数者负责提供MULTI_DJ_MAX_CNT个字节的空间
+   3577          *@return 返回匹配到记录数
+   3578          @note mode = 0 时，实际上是检测一下是否有相同的单据，并不关心有几个相同的，相同的单据的偏移，所以传进来的result_offset_buf可以为0
+   3579                mode = 1时，需要搜索所有的可以匹配的单据，所以需要知道有几个匹配的单据，以及单据的偏移
+   3580          ***************************************************************************
+   3581          */
+   3582          #if 0
+   3583          unsigned char danju_search(unsigned char mode,unsigned char* key_str,unsigned char *result_offset_buf)
+   3584          {
+   3585          	unsigned char dir_str[35];
+   3586          	unsigned char tmp_buffer[sizeof(MULTXLH_NAME)];		//sizeof(MULTXLH_NAME)  > sizeof(MULTCHK_NAME)
+   3587          	unsigned int	tmp,link_header;
+   3588          	unsigned char  cnt = 0;
+   3589          	unsigned int  target_node_size;
+   3590          
+   3591          	if ((mode & 0xf0) == 0)
+   3592          	{
+   3593          		strcpy(dir_str,multi_check_dirctory);
+   3594          		strcat(dir_str,multchk_data_info_file);
+   3595          		target_node_size = sizeof(MULTCHK_NAME);
+   3596          	}
+   3597          	else
+   3598          	{
+   3599          		strcpy(dir_str,serial_data_dirctory);
+   3600          		strcat(dir_str,multxlh_data_info_file);
+   3601          		target_node_size = sizeof(MULTXLH_NAME);
+   3602          	}
+   3603          
+   3604          	//step1:从信息文件中找到节点文件中节点链表的首地址
+   3605          	if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   3606          	{
+   3607          		return 0;
+   3608          	}
+   3609          
+   3610          	if (file1.fsize<12)
+   3611          	{
+   3612          		f_close(&file1);
+   3613          		return 0;
+   3614          	}
+   3615          
+   3616          	f_lseek(&file1,8);
+   3617          	if (f_read(&file1,(void*)&link_header,4,&tmp) != FR_OK)
+   3618          	{
+   3619          		f_close(&file1);
+   3620          		return 0;
+   3621          	}
+   3622          
+   3623          	if (tmp != 4)
+   3624          	{
+   3625          		f_close(&file1);
+   3626          		return 0;
+   3627          	}
+   3628          
+   3629          	f_close(&file1);
+   3630          
+   3631          	if (link_header == 0)
+   3632          	{
+   3633          		return 0;
+   3634          	}
+   3635          
+   3636          
+   3637          	//step2: 打开节点文件，按照链表的顺序进行搜索
+   3638          	if ((mode & 0xf0) == 0)
+   3639          	{
+   3640          		strcpy(dir_str,multi_check_dirctory);
+   3641          		strcat(dir_str,multchk_list_file);
+   3642          	}
+   3643          	else
+   3644          	{
+   3645          		strcpy(dir_str,serial_data_dirctory);
+   3646          		strcat(dir_str,multxlh_list_file);
+   3647          	}
+   3648          
+   3649          	if (f_open(&file1,dir_str,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   3650          	{
+   3651          		return 0;
+   3652          	}
+   3653          
+   3654          	do 
+   3655          	{
+   3656          		f_lseek(&file1,(link_header-1)*target_node_size);
+   3657          		if (f_read(&file1,(void*)&tmp_buffer,target_node_size,&tmp) != FR_OK)
+   3658          		{
+   3659          			break;
+   3660          		}
+   3661          
+   3662          		if (tmp != target_node_size)
+   3663          		{
+   3664          			break;
+   3665          		}
+   3666          
+   3667          		if (mode&0x0f)
+   3668          		{
+   3669          			if ((mode & 0xf0) == 0)
+   3670          			{
+   3671          				if (memcmp(key_str,((MULTCHK_NAME*)tmp_buffer)->listname,strlen(key_str)) == 0)
+   3672          				{
+   3673          					result_offset_buf[cnt++] = link_header;
+   3674          				}
+   3675          			}
+   3676          			else
+   3677          			{
+   3678          				if (memcmp(key_str,((MULTXLH_NAME*)tmp_buffer)->listname,strlen(key_str)) == 0)
+   3679          				{
+   3680          					result_offset_buf[cnt++] = link_header;
+   3681          				}
+   3682          			}
+   3683          		}
+   3684          		else
+   3685          		{
+   3686          			if ((mode & 0xf0) == 0)
+   3687          			{
+   3688          				if (strcmp(key_str,((MULTCHK_NAME*)tmp_buffer)->listname) == 0)
+   3689          				{
+   3690          					//result_offset_buf[cnt++] = link_header;
+   3691          					return 1;		//检测到相同的单据
+   3692          				}
+   3693          			}
+   3694          			else
+   3695          			{
+   3696          				if (strcmp(key_str,((MULTXLH_NAME*)tmp_buffer)->listname) == 0)
+   3697          				{
+   3698          					//result_offset_buf[cnt++] = link_header;
+   3699          					return 1;		//检测到相同的单据
+   3700          				}
+   3701          			}
+   3702          		}
+   3703          
+   3704          
+   3705          		if ((mode & 0xf0) == 0)
+   3706          		{
+   3707          			link_header = ((MULTCHK_NAME*)tmp_buffer)->prev;
+   3708          		}
+   3709          		else
+   3710          		{
+   3711          			link_header = ((MULTXLH_NAME*)tmp_buffer)->prev;
+   3712          		}
+   3713          	} while (link_header);
+   3714          
+   3715          	f_close(&file1);
+   3716          
+   3717          	return cnt;
+   3718          }
+   3719          #endif
+   3720          
+   3721          #ifdef T5_SD_DEBUG
+   3722          
+   3723          void debug_out(unsigned char* out,unsigned int len,unsigned char format)
+   3724          {
+   3725          	unsigned int write_num;
+   3726          	unsigned char *pBuf;
+   3727          	unsigned char data;
+   3728          
+   3729          	if (0 == debug_file_status)
+   3730          	{
+   3731          		//创建DEBUG结果的输出文件
+   3732          		if (f_open(&debug_file,"Debug.out",FA_OPEN_ALWAYS | FA_WRITE) != FR_OK)
+   3733          		{
+   3734          			return;
+   3735          		}
+   3736          
+   3737          		f_lseek(&debug_file,debug_file.fsize);
+   3738          		debug_file_status = 1;
+   3739          	}
+   3740          
+   3741          
+   3742          	if (1 == debug_file_status)
+   3743          	{
+   3744          		if (format == 0)
+   3745          		{
+   3746          			//表明打印的数据是16进制数，需要转换为ASCII格式
+   3747          			pBuf = (unsigned char*)Jmalloc(len*3);
+   3748          			if (pBuf == NULL)
+   3749          			{
+   3750          				return;
+   3751          			}
+   3752          
+   3753          			for (write_num = 0;write_num < len;write_num++)
+   3754          			{
+   3755          				data = out[write_num];
+   3756          				pBuf[write_num*3] = HexToAscii(data >> 4);
+   3757          				pBuf[write_num*3+1] = HexToAscii(out[write_num]&0x0f);
+   3758          				pBuf[write_num*3+2] = ' ';
+   3759          			}
+   3760          
+   3761          			if (f_write(&debug_file,pBuf,len*3,&write_num) != FR_OK)
+   3762          			{
+   3763          				Jfree(pBuf);
+   3764          				f_close(&debug_file);
+   3765          				debug_file_status = 0;
+   3766          			}
+   3767          
+   3768          			Jfree(pBuf);
+   3769          		}
+   3770          		else
+   3771          		{
+   3772          			//表明打印的数据是ASCII格式，不需要转换
+   3773          			if (f_write(&debug_file,out,len,&write_num) != FR_OK)
+   3774          			{
+   3775          				f_close(&debug_file);
+   3776          				debug_file_status = 0;
+   3777          			}
+   3778          		}
+   3779          
+   3780          		f_sync(&debug_file);
+   3781          	}
+   3782          }
+   3783          
+   3784          
+   3785          void delete_debug_file(void)
+   3786          {
+   3787          	debug_file_status = 0;
+   3788          	if (f_open(&debug_file,"Debug.out",FA_OPEN_EXISTING | FA_WRITE) != FR_OK)
+   3789          	{
+   3790          		return;
+   3791          	}
+   3792          	
+   3793          	f_lseek(&debug_file,0);
+   3794          	f_truncate(&debug_file);
+   3795          
+   3796          	f_close(&debug_file);
+   3797          }
+   3798          
+   3799          void close_debug_file(void)
+   3800          {
+   3801          	if (debug_file_status == 1)
+   3802          	{
+   3803          		f_close(&debug_file);
+   3804          	}
+   3805          }
+   3806          
+   3807          #endif
+   3808          
+   3809          #if 0
+   3810          int check_serial_list_file(void)
+   3811          {
+   3812          #if 0
+   3813          	unsigned char buf1[200],buf2[200];
+   3814          	unsigned int tmp;
+   3815          
+   3816          	if (f_open(&file3,"/T5_DB/serial/serial.lst",FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   3817          	{
+   3818          		return -1;
+   3819          	}
+   3820          
+   3821          	if (file3.fsize >= 2*sizeof(SERIAL_DATA_NODE))
+   3822          	{
+   3823          		f_lseek(&file3,file3.fsize - 2*sizeof(SERIAL_DATA_NODE));
+   3824          		if (f_read(&file3,(void*)buf1,sizeof(SERIAL_DATA_NODE),&tmp) != FR_OK)
+   3825          		{
+   3826          			f_close(&file3);
+   3827          			return -1;
+   3828          		}
+   3829          
+   3830          		if (tmp != sizeof(SERIAL_DATA_NODE))
+   3831          		{
+   3832          			f_close(&file3);
+   3833          			return -1;
+   3834          		}
+   3835          
+   3836          		if (f_read(&file3,(void*)buf2,sizeof(SERIAL_DATA_NODE),&tmp) != FR_OK)
+   3837          		{
+   3838          			f_close(&file3);
+   3839          			return -1;
+   3840          		}
+   3841          
+   3842          		if (tmp != sizeof(SERIAL_DATA_NODE))
+   3843          		{
+   3844          			f_close(&file3);
+   3845          			return -1;
+   3846          		}
+   3847          
+   3848          		if (memcmp(buf1,buf2,sizeof(SERIAL_DATA_NODE)) == 0)
+   3849          		{
+   3850          			f_close(&file3);
+   3851          			return 1;
+   3852          		}
+   3853          	}
+   3854          
+   3855          		f_close(&file3);
+   3856          
+   3857          #endif
+   3858          
+   3859          	unsigned int index;
+   3860          	unsigned char *ptmp;
+   3861          
+   3862          	if (f_open(&file3,"/T5_DB/serial/serial.lst",FA_OPEN_EXISTING | FA_READ) != FR_OK)
+   3863          	{
+   3864          		return -1;
+   3865          	}
+   3866          
+   3867          	index = file3.fsize/sizeof(SERIAL_DATA_NODE);
+   3868          	f_close(&file3);
+   3869          
+   3870          	ptmp = record_module_read(REC_TYPE_SERIAL_LIST,index);
+   3871          	if (ptmp == 0)
+   3872          	{
+   3873          
+   3874          		return 1;
+   3875          	}
+   3876          
+   3877          	return 0;
+   3878          }
+   3879          #endif
+
+   Maximum stack usage in bytes:
+
+     Function                       .cstack
+     --------                       -------
+     add_goods_node_ext                  0
+     calc_check_value                   16
+     check_database                     40
+     check_record_dir                   72
+     check_resdatafile                   8
+     check_updatefile                   24
+     clear_log_file                      8
+     del_resdata_bin                     8
+     del_update_bin                      8
+     delete_goods_node                 576
+     delete_one_node                   192
+     get_file_size                       8
+     get_goodsnode                      56
+     goods_node_replace_recover         72
+     init_data_info_file                24
+     init_hash_table_file              528
+     memcpy                              8
+     memset                              8
+     read_rec_file                      24
+     rec_search                        600
+     rec_search_ext                    592
+     rec_searchby_tag                   16
+     rec_searchby_tag_ext               32
+     rec_serachby_name                   0
+     record_add                        224
+     record_add_ext                      0
+     record_add_recover                 56
+     record_clear                       72
+     record_clear_recover               64
+     record_module_count                88
+     record_module_init                 72
+     record_module_read                 56
+     record_module_replace              64
+     record_recover                     24
+     recover_hash_table_modify         320
+     recover_record_by_logfile         280
+     save_log_file                     552
+     update_link_info_after_addNode    552
+     write_rec_file                     24
+
+
+   Section sizes:
+
+     Function/Label                 Bytes
+     --------------                 -----
+     memcpy                           14
+     memset                           20
+     rec_module_buffer               512
+     current_node_offset               4
+     g_rec_offset                      4
+     danju_context                     4
+     log_len                           4
+     file2                           548
+     file3                           548
+     dir                              28
+     init_hash_table_file            106
+     init_data_info_file             100
+     record_module_init              312
+     record_module_read              262
+     calc_check_value                 76
+     update_link_info_after_addNode  268
+     save_log_file                   278
+     clear_log_file                   86
+     record_add                      912
+     record_add_ext                    2
+     delete_goods_node               400
+     record_module_replace           204
+     record_module_count             248
+     record_clear                    340
+     rec_search                      372
+     rec_serachby_name                 2
+     rec_search_ext                  316
+     rec_searchby_tag                 36
+     rec_searchby_tag_ext             52
+     get_goodsnode                   132
+     delete_one_node                 904
+     get_file_size                    40
+     read_rec_file                   100
+     write_rec_file                  120
+     check_record_dir                252
+     check_updatefile                192
+     check_resdatafile               120
+     del_update_bin                   56
+     del_resdata_bin                  56
+     recover_hash_table_modify       560
+     record_add_recover              536
+     record_clear_recover            168
+     add_goods_node_ext                2
+     goods_node_replace_recover      204
+     record_recover                  168
+     recover_record_by_logfile       196
+     check_database                  140
+     ??DataTable12                     4
+     ??DataTable50                     4
+     ??DataTable59                     4
+     ??DataTable60                     4
+     ??DataTable73                     4
+     ??DataTable74                     4
+     ??DataTable75                     4
+     ??DataTable106                    4
+     ??DataTable111                    4
+     ??DataTable112                    4
+     ??DataTable113                    4
+     ??DataTable115                    4
+     ??DataTable116                    4
+     ??DataTable121                    4
+     ?<Constant "info">                8
+     ?<Constant "/T6_DB">              8
+     ?<Constant "/T6_DB/goods">       16
+     ?<Constant "/T6_DB/check">       16
+     ?<Constant "/T6_DB/batch">       16
+     ?<Constant "/barhash.tbl">       16
+     ?<Constant "/batch.inf">         12
+     ?<Constant "/goods.lst">         12
+     ?<Constant "/check.lst">         12
+     ?<Constant "/batch.lst">         12
+     ?<Constant "/T6_DB/log.tmp">     16
+     ?<Constant "/update.bin">        12
+     ?<Constant "/resdata.tmp">       16
+
+ 
+ 1 652 bytes in section .bss
+   172 bytes in section .rodata
+ 8 408 bytes in section .text
+ 
+ 8 374 bytes of CODE  memory (+ 34 bytes shared)
+   172 bytes of CONST memory
+ 1 652 bytes of DATA  memory
+
+Errors: none
+Warnings: 160

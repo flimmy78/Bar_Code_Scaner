@@ -1,0 +1,200 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     06/Jan/2014  10:04:35 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\Drivers\TimeBase.c                     #
+#    Command line =  D:\work\T6\FW\src\Drivers\TimeBase.c -lcN                #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\TimeBase.ls #
+#                    t                                                        #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\TimeBase.o   #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\Drivers\TimeBase.c
+      1          /**
+      2           * @file  Timebase.c
+      3           * @brief use TIM1 to generate a time base 
+      4           * @version 1.0
+      5           * @author joe
+      6           * @date 2009年09月10日
+      7           * @note
+      8          */
+      9          #include "stm32f10x_lib.h" 
+     10          
+     11          #include "TimeBase.h"
+     12          
+     13          static int TimingDelay;
+     14          
+     15          /**
+     16           * @brief     软延时
+     17           * @param[in] u16 delay 延时参数 实际延时时间等于delay/2 us.
+     18           * @param[out] none
+     19           * @return none
+     20           * @note 开始想利用Timer来做延时，但由于需要的时基比较小，只有0.5us，所以timer的周期设定值就很小，
+     21           *       而ucosII在进出中断的开销太大，导致程序根本就无法退出timer的中断程序；
+     22           *       后来又想通过查询Timer的Flag来实现时基，但是发现Timer的UpdateFlag竟然一直有效，没得时间慢慢去找
+     23           *       原因了，干脆就用指令来实现延时得了！
+     24          */
+     25          void Delay(unsigned int delay)
+     26          {
+     27          	do{
+     28          		;
+     29          	}while(delay--);
+     30          }
+     31          
+     32          
+     33          /**
+     34           * @brief     初始化产生延时时基的计数器TIM2,设定计数器产生1ms的时基
+     35           * @param[in] none
+     36           * @param[out] none
+     37           * @return none
+     38           * @note   此初始化函数中调用了BSP_IntVectSet(BSP_INT_ID_TIM2, TIM2_UpdateISRHandler)这个函数，这个是设定TIM2的中断处理函数的
+     39           *				 在移植的时候需要根据不同工程中设置中断处理函数的方法来稍作修改。       
+     40          */
+     41          void TimeBase_Init(void)
+     42          {
+     43          	TIM_TimeBaseInitTypeDef						TIM_TimeBaseStructure;
+     44          	TIM_OCInitTypeDef							TIM_OCInitStructure;
+     45          	NVIC_InitTypeDef							NVIC_InitStructure;
+     46          
+     47          	//初始化结构体变量
+     48          	TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+     49          	TIM_OCStructInit(&TIM_OCInitStructure);
+     50          
+     51          	/*开启相应时钟 */
+     52          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);  
+     53          
+     54          
+     55          	/* Time Base configuration */
+     56          	TIM_TimeBaseStructure.TIM_Prescaler			= 0;      //72M的计数频率
+     57          	TIM_TimeBaseStructure.TIM_CounterMode		= TIM_CounterMode_Up; //向上计数
+     58          	TIM_TimeBaseStructure.TIM_Period			= (72000/2-1);      //500us的定时
+     59          	TIM_TimeBaseStructure.TIM_ClockDivision		= 0x0;
+     60          
+     61          	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
+     62          
+     63          	/* Channel 1, 2, 3 and 4 Configuration in Timing mode */
+     64          	TIM_OCInitStructure.TIM_OCMode				= TIM_OCMode_Timing;
+     65          //   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+     66          //   TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Disable;
+     67          	TIM_OCInitStructure.TIM_Pulse				= 0x0;
+     68          
+     69          	TIM_OC1Init(TIM2, &TIM_OCInitStructure);
+     70          
+     71          	/* Enable the TIM2 Interrupt */
+     72          	NVIC_InitStructure.NVIC_IRQChannel			= TIM2_IRQChannel;
+     73          	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+     74          	//NVIC_InitStructure.NVIC_IRQChannelSubPriority	= 1;
+     75          	NVIC_InitStructure.NVIC_IRQChannelCmd		= ENABLE;
+     76          	NVIC_Init(&NVIC_InitStructure);
+     77          }
+     78          
+     79          /**
+     80           * @brief 开始利用TIM2定时计数
+     81           * @param[in] unsigned int nTime*5 等于要延时的毫秒数， nTime = 10 产生50ms的延时，nTime  = 200时，产生1S的延时（此时基是经过测试的）
+     82           * @return  none
+     83          */
+     84          void StartDelay(unsigned short nTime)
+     85          {
+     86              TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+     87              //BSP_IntEn(BSP_INT_ID_TIM2);
+     88              /* TIM counter enable */
+     89              TIM_Cmd(TIM2, ENABLE);
+     90              TimingDelay = nTime*10;
+     91          }
+     92          
+     93          
+     94          /**
+     95           * @brief 判断延时时间是否到
+     96           * @param[in] none
+     97           * @return 0: 定时到
+     98           *        1: 定时未到
+     99          */
+    100          unsigned char DelayIsEnd(void)
+    101          {
+    102          	if(TimingDelay>0)
+    103          		return 1;
+    104          	else
+    105          		return 0;
+    106          //	if(TimingDelay == 0)
+    107          //	{
+    108          //		return 0;
+    109          //	}
+    110          //	else
+    111          //		return 1; 
+    112          }
+    113          
+    114          /**
+    115           * @brief TIM2的溢出中断ISR
+    116           * @param[in] none
+    117           * @return none
+    118           * @note  TIM2的中断服务函数调用
+    119          */
+    120          void TIM2_UpdateISRHandler(void)
+    121          {    
+    122          	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
+    123          	{
+    124          		if(TimingDelay != 0)
+    125          		{
+    126          			TimingDelay --;
+    127          		}  
+    128          		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    129          	}
+    130          }
+
+   Maximum stack usage in bytes:
+
+     Function              .cstack
+     --------              -------
+     Delay                      0
+     DelayIsEnd                 0
+     StartDelay                 8
+     TIM2_UpdateISRHandler      8
+     TimeBase_Init             40
+
+
+   Section sizes:
+
+     Function/Label        Bytes
+     --------------        -----
+     TimingDelay              4
+     Delay                   10
+     TimeBase_Init          110
+     StartDelay              38
+     DelayIsEnd              16
+     TIM2_UpdateISRHandler   46
+     ??DataTable4             4
+
+ 
+   4 bytes in section .bss
+ 224 bytes in section .text
+ 
+ 224 bytes of CODE memory
+   4 bytes of DATA memory
+
+Errors: none
+Warnings: none

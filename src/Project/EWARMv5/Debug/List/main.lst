@@ -1,0 +1,737 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     31/Mar/2014  10:27:49 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\Project\main.c                         #
+#    Command line =  D:\work\T6\FW\src\Project\main.c -lcN                    #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\main.lst    #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\main.o       #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\Project\main.c
+      1          /**
+      2          * @file main.c
+      3          * @brief 2.4GPOS项目主程序
+      4          *
+      5          * @version V0.0.1
+      6          * @author joe
+      7          * @date 2010年4月26日
+      8          * @note
+      9          *		none
+     10          *
+     11          * @copy
+     12          *
+     13          * 此代码为深圳江波龙电子有限公司项目代码，任何人及公司未经许可不得复制传播，或用于
+     14          * 本公司以外的项目。本司保留一切追究权利。
+     15          *
+     16          * <h1><center>&copy; COPYRIGHT 2009 netcom</center></h1>
+     17          */
+     18          
+     19          /* Private Includes ------------------------------------------------------------------*/
+     20          #include "stm32f10x_lib.h"
+     21          #include "ucos_ii.h"
+     22          #include <string.h>
+     23          #include <stdio.h>
+     24          #include <stdlib.h>
+     25          #include "app.h"
+     26          #include "lcd.h"
+     27          #include "data_uart.h"
+     28          #include "gui.h"
+     29          #include "keypad.h"
+     30          #include "dialog.h"
+     31          #include "res_spi.h"
+     32          #include "res_upgrade.h"
+     33          #include "TimeBase.h"
+     34          #include "calendar.h"
+     35          #include "uart_drv.h"
+     36          #include "Terminal_para.h"
+     37          #include "power_detect.h"
+     38          #include "record.h"
+     39          #include "stm32f10x_flash_config.h"
+     40          #include "uE988_scan.h"
+     41          #include "pic.h"
+     42          #include "data_transfer.h"
+     43          #include "usb_lib.h"
+     44          #include "PCUsart.h"
+     45          //#include "http_protocol.h"
+     46          //#include "em310_driver.h"
+     47          #include "JMemory.h"
+     48          #include "usb_pwr.h"
+     49          /* Private define ------------------------------------------------------------*/
+     50          #define BOOTCODE_EXIST		//Enable this Macro for Release,Disable for Debug; 
+     51          
+     52          // Cortex System Control register address
+     53          #define SCB_SysCtrl					((u32)0xE000ED10)
+     54          // SLEEPDEEP bit mask
+     55          #define SysCtrl_SLEEPDEEP_Set		((u32)0x00000004)
+     56          
+     57          //define the stack size of each task
+     58          #define STACK_SIZE_TASKBG			512
+     59          #define STACK_SIZE_TASKUI			512
+     60          #define STACK_SIZE_TASKKEY			256
+     61          
+     62          #define MAX_KEY_NUM		8
+     63          
+     64          
+     65          /* Global variables ---------------------------------------------------------*/
+     66          ErrorStatus			HSEStartUpStatus;							//Extern crystal OK Flag
+     67          unsigned int		pos_state;									//POS state flag
+     68          //unsigned char		factory_test_start_flag;
+     69          
+     70          
+     71          OS_STK				task_backgroud_stk[STACK_SIZE_TASKBG];		//the stack of the task_backgroud
+     72          OS_STK				task_ui_stk[STACK_SIZE_TASKUI];				//the stack of the task_ui
+     73          OS_STK				task_key_stk[STACK_SIZE_TASKKEY];			//the stack of the task_keyboard
+     74          
+     75          void				*KeyPool[MAX_KEY_NUM];			// keyvalue message pool
+     76          OS_EVENT			*pKeyOSQ;						// get a key value Semaphore
+     77          OS_EVENT			*pKeypressedEvent;				//any key pressed  event pointer ---communication between ISR and task_keyboard
+     78          // 0x20000000-0x20000010 此字节为主程序与BootCode间的参数传递区
+     79          __no_init unsigned int status_iap @ "VENDOR_RAM";
+     80          __no_init unsigned int nouse[3] @ "VENDOR_RAM";
+     81          
+     82          /* Private functions ---------------------------------------------------------*/
+     83          static void Unconfigure_All(void);
+     84          static void GPIO_AllAinConfig(void);
+     85          static void task_background(void *pp);
+     86          static void task_keyboard(void *pp);
+     87          void u_disk_proc(void);
+     88          
+     89          int bluetooth_module_state;		//蓝牙模块的状态
+     90          
+     91          /* External variables -----------------------------------------------*/
+     92          extern	TTerminalPara			g_param;					//Terminal Param
+     93          
+     94          /**
+     95          * @brief 上电后第一个运行起来的线程，首先完成硬件的初始化，系统的初始化，设置相应的状态机，然后创建其它线程，
+     96          *  可以运行其它线程创建的任务，并返回任务执行结果。
+     97          */
+     98          static void task_background(void *pp)
+     99          {
+    100          	int				ret,i = 0;
+    101          	int				time_out = 0;
+    102          	//unsigned char   *key = NULL;
+    103          
+    104          	//unsigned char vrh,bt,vcoml,vcomh,vmf;
+    105          	//unsigned char dis_str[21];
+    106          	//unsigned char *var;
+    107          
+    108          
+    109          	OS_CPU_SysTickInit();
+    110          
+    111          	// Clear SLEEPDEEP bit of Cortex System Control Register
+    112          	*(vu32 *) SCB_SysCtrl &= ~SysCtrl_SLEEPDEEP_Set;
+    113          
+    114          	Unconfigure_All();
+    115          
+    116          	// 初始化串口管理模块
+    117          	Comm_Init();
+    118          
+    119          	// 数据串口(调试口)初始化
+    120          	data_uart_init();						
+    121          
+    122          	//初始化时基函数
+    123          	TimeBase_Init();
+    124          
+    125          	// 初始化键盘，蜂鸣器和LED口
+    126          	keypad_init();	
+    127          
+    128          	//DTU_Init_Configuration();						//初始化配置
+    129          
+    130          	//EM310_PowerOn();		//此处就将GPRS的电源打开
+    131              //    trip(1);
+    132          	//长按开机
+    133          	OSTimeDlyHMSM(0,0,0,50);
+    134          	PowerOn();
+    135          	Beep(BEEP_DELAY);
+    136          	JMemory_init();
+    137          
+    138          	//初始化POS机的状态机
+    139          	pos_state = 0;
+    140          
+    141          	//factory_test_start_flag = 0;//初始化生产测试标志
+    142          
+    143          #ifdef  BOOTCODE_EXIST
+    144          	// 检查ROM是否被读保护，没有则执行读保护操作
+    145          	if( FLASH_GetReadOutProtectionStatus() != SET )
+    146          	{
+    147          		FLASH_Unlock();
+    148          		FLASH_ReadOutProtection(ENABLE);
+    149          	}
+    150          #endif      
+    151          
+    152          	//初始化RTC模块
+    153          	Calendar_Init();
+    154          
+    155          	// 初始化GUI接口
+    156          	gui_init();
+    157                  
+    158          	//Lcd_test();
+    159          	// 显示Start Up
+    160          	//gui_TextOut(0, i, "System startup...",0,1); i+=13;
+    161          
+    162          	//gui_TextOut(0, i, "Load resource...",0,1); i+= 13;
+    163          
+    164          	//检查系统的资源是否已经装载OK
+    165          	if (res_init()!=0)		
+    166          	{
+    167          		//资源检查失败
+    168          		//gui_SetTextColor(BG_COLOR);
+    169          		gui_TextOut(0, 50, "Load resource failed",0,1); i+=13;
+    170          
+    171          		goto sys_err_handle;
+    172          		//pos_state = STA_FACTORY_MODE;
+    173          	}
+    174          
+    175          	gui_PictureOut(16,8,PIC_LOGO,1);
+    176          
+    177          
+    178          	// 初始化PN532接口
+    179          	//PN532_Port_Init();
+    180          
+    181          	//窗体运行模块初始化
+    182          	dlg_init();
+    183          
+    184          	OSTimeDlyHMSM(0,0,0,200);
+    185          #if 1
+    186          	//检查系统保存在SPI SD中的终端参数是否合法
+    187          	ret = ReadTerminalPara();
+    188          	if (ret)
+    189          	{
+    190          		//参数不合法，将系统恢复为出厂设置
+    191          		if(DefaultTerminalPara())
+    192          		{
+    193          			gui_clear(BG_COLOR);
+    194          			//gui_TextOut(16, 50, "系统参数创建失败",0);
+    195          			//gui_TextOutEx(CENTER_ALIGN, 26, "Load System Param",0,1);
+    196          			gui_TextOut(0, 50, "Load SysParam failed",0,1);
+    197          			goto sys_err_handle;
+    198          		}
+    199          	}
+    200          #endif
+    201          
+    202          	//初始化存储记录的模块
+    203          	if(record_module_init())
+    204          	{
+    205          		gui_clear(BG_COLOR);
+    206          		//gui_TextOut_ext(CENTER_ALIGN,60 , "请检查是否插入",0); // y += get_dlg_fontsize();
+    207          		//gui_TextOut_ext(CENTER_ALIGN,73 , "存储卡",0);
+    208          		//gui_TextOutEx(CENTER_ALIGN,26 , "Record module Init",0,1);
+    209          		gui_TextOut(0,50 , "Record Init failed",0,1);
+    210          		goto sys_err_handle;
+    211          	}
+    212          
+    213          	if (recover_record_by_logfile())
+    214          	{
+    215          		gui_clear(BG_COLOR);
+    216          		//gui_TextOut_ext(CENTER_ALIGN,60 , "记录恢复失败",0); // y += get_dlg_fontsize();
+    217          		//gui_TextOutEx(CENTER_ALIGN,26 , "Records recovery",0,1); // y += get_dlg_fontsize();
+    218          		gui_TextOut(0,50 , "Recovery failed",0,1);
+    219          		goto sys_err_handle;
+    220          	}
+    221                 
+    222          	//检测条形码阅读器
+    223          	UE988_Init(g_param.decoder_switch_map);
+    224          
+    225          	//蓝牙模块初始化
+    226          	bluetooth_module_state = YFBT07_init();
+    227                  //YFBT07_Test();
+    228          
+    229          	//初始化电池电压检测以及充电状态检测的模块
+    230          	InitPowerDetectModule();  
+    231          	
+    232          	////初始化
+    233          	device_init_by_setting();
+    234          	if ((USBLink_Insert_Detect() == 0) && (g_param.transfer_mode == TRANSFER_MODE_U_DISK))
+    235          	{
+    236          		while((bDeviceState != CONFIGURED)&&(time_out < 15))
+    237          		{
+    238          			time_out++;
+    239          			OSTimeDlyHMSM(0,0,0,100);
+    240          		}
+    241          
+    242          		if (bDeviceState == CONFIGURED)
+    243          		{
+    244          			u_disk_proc();
+    245          		}
+    246          	}
+    247          	OSTimeDlyHMSM(0,0,0,100);
+    248          	// 进入显示主进程     
+    249          	// 创建进程间的信号量
+    250          	pKeyOSQ				= OSQCreate(&KeyPool[0], MAX_KEY_NUM);	// 建立按键消息队列
+    251          	pKeypressedEvent	= OSSemCreate(0);					//建立按键事件信号量
+    252          	Keypad_Int_Enable();									//使能键盘的中断功能
+    253          
+    254          
+    255          	// 显示子进程
+    256          	OSTaskCreateExt(task_ui,
+    257          		(void *)0,
+    258          		&task_ui_stk[STACK_SIZE_TASKUI-1],
+    259          		7,
+    260          		7,
+    261          		&task_ui_stk[0],
+    262          		STACK_SIZE_TASKUI,
+    263          		(void *)0,
+    264          		(INT16U)(OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR));
+    265          
+    266          	// 键盘子进程
+    267          	OSTaskCreateExt(task_keyboard,
+    268          		(void *)0,
+    269          		&task_key_stk[STACK_SIZE_TASKKEY-1],
+    270          		8,
+    271          		8,
+    272          		&task_key_stk[0],
+    273          		STACK_SIZE_TASKKEY,
+    274          		(void *)0,
+    275          		(INT16U)(OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR));
+    276          
+    277          	// 接收显示命令并显示
+    278          	for(;;)
+    279          	{
+    280          		dlg_run_task();
+    281          		OSTimeDlyHMSM(0,0,0,100);
+    282          	}
+    283          
+    284          
+    285          sys_err_handle:
+    286          
+    287          	OSSchedLock();
+    288          
+    289          	USB_Cable_Config(1);
+    290          	g_mass_storage_device_type = MASSTORAGE_DEVICE_TYPE_SPI_FLASH;
+    291          	usb_device_init(USB_MASSSTORAGE);
+    292          
+    293          	while (1)
+    294          	{
+    295          		if( *keypad_getkey() == KEY_POWER)
+    296          		{
+    297          			Beep(BEEP_DELAY);
+    298          			USB_Cable_Config(0);
+    299          			//bDeviceState = UNCONNECTED;
+    300          			OSSchedUnlock();
+    301          			NVIC_SETFAULTMASK();
+    302          			NVIC_GenerateSystemReset();
+    303          		}
+    304          
+    305          		Delay(50000);
+    306          	}
+    307          }
+    308          
+    309          /**
+    310          * @brief 刷新显示屏显示的任务
+    311          */
+    312          static void task_keyboard(void *pp)
+    313          {
+    314          	unsigned char * key;
+    315          	unsigned char					err_code;
+    316          
+    317          	for(;;){		
+    318          
+    319          		OSSemPend(pKeypressedEvent, 0, &err_code);	//在此处检测是否有按键事件发生的信号量，此信号量在外部中断里面Post进来的
+    320          		if(err_code == OS_NO_ERR)
+    321          		{
+    322          			key = keypad_getkey();
+    323          			if(key)
+    324          			{
+    325          				OSQPost(pKeyOSQ, (void*)key);               
+    326          				if(*key == KEY_POWER)
+    327          				{
+    328          					StartDelay(150);
+    329          					while((DelayIsEnd()!= 0)&&(*(keypad_getkey()) == KEY_POWER));
+    330          					if(DelayIsEnd() == 0)
+    331          					{   
+    332          						OSSchedLock();		//不要再进行任务调度了
+    333          						Beep(BEEP_DELAY);
+    334          						Lcd_Clear(BG_COLOR);
+    335          						//gui_FillRect(0, 31, 240, GUI_HEIGHT/2-30, BG_COLOR);
+    336          						//gui_SetTextColor(0);
+    337          						//gui_SetFont(48);
+    338          						gui_TextOut_ext(CENTER_ALIGN, 26, "POWER OFF",0,1);                         
+    339          						while(*(keypad_getkey()) == KEY_POWER)
+    340          						{
+    341          							;
+    342          						}
+    343          						//释放POWER键之后，先清屏再关机
+    344          						Lcd_Clear(BG_COLOR);
+    345          						PowerOff();      ///关机
+    346          					}
+    347          				}
+    348          				else                  
+    349          				{    
+    350          					if ((g_param.beeper_vol)&&(*key != KEY_SCAN))
+    351          					{
+    352          						Beep(BEEP_DELAY);                    
+    353          					}
+    354          					keypad_release();
+    355          				}
+    356          			}
+    357          			else if ((USBLink_Insert_Detect() == 0)&&(g_param.transfer_mode == TRANSFER_MODE_U_DISK)&&(bDeviceState == CONFIGURED))
+    358          			{
+    359          				u_disk_proc();
+    360          			}
+    361          		}
+    362          	}
+    363          }
+    364          /*******************************************************************************
+    365          * Function Name  : main
+    366          * Description    : Main program.
+    367          * Input          : None
+    368          * Output         : None
+    369          * Return         : None
+    370          *******************************************************************************/
+    371          int main(void)
+    372          {
+    373          	/* System Clocks Configuration **********************************************/
+    374          	RCC_Configuration(); 
+    375          #ifdef BOOTCODE_EXIST
+    376          	/* NVIC Configuration *******************************************************/
+    377          	NVIC_SetVectorTable(NVIC_VectTab_FLASH, IAP_SIZE);		//需要加密的 bootcode
+    378          #else	
+    379          	/* NVIC Configuration *******************************************************/
+    380          	NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0);
+    381          #endif
+    382          	memset(task_backgroud_stk, 0xAA, sizeof(task_backgroud_stk));
+    383          	memset(task_ui_stk, 0xAA, sizeof(task_ui_stk));
+    384          	memset(task_key_stk, 0xAA, sizeof(task_key_stk));
+    385          
+    386          	status_iap = 0;		//初始化用于在应用程序和BootLoader之间传递参数的RAM变量
+    387          
+    388          	OSInit();
+    389          
+    390          	OSDebugInit();
+    391          
+    392          	OSTaskCreateExt(task_background,
+    393          		(void *)0,
+    394          		&task_backgroud_stk[STACK_SIZE_TASKBG-1],
+    395          		6,
+    396          		6,
+    397          		&task_backgroud_stk[0],
+    398          		STACK_SIZE_TASKBG,
+    399          		(void *)0,
+    400          		(INT16U)(OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR));
+    401          
+    402          	OSStart();
+    403          }
+    404          
+    405          /*******************************************************************************
+    406          * Function Name  : RCC_Configuration
+    407          * Description    : Configures the different system clocks.
+    408          * Input          : None
+    409          * Output         : None
+    410          * Return         : None
+    411          *******************************************************************************/
+    412          void RCC_Configuration(void)
+    413          {   
+    414          	vu32 i=0;
+    415          	/* RCC system reset(for debug purpose) */
+    416          	RCC_DeInit();
+    417          
+    418          	/* Enable HSE							*/
+    419          	RCC_HSEConfig(RCC_HSE_ON);
+    420          	// 这里要做延时，才能兼容某些比较差的晶体，以便顺利起震	
+    421          	for(i=0; i<200000; i++);
+    422          
+    423          	/* Wait till HSE is ready			*/
+    424          	HSEStartUpStatus = RCC_WaitForHSEStartUp();
+    425          
+    426          	if(HSEStartUpStatus == SUCCESS)
+    427          	{
+    428          		/* Enable Prefetch Buffer		*/
+    429          		FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
+    430          
+    431          		/* Flash 2 wait state			*/
+    432          		FLASH_SetLatency(FLASH_Latency_2);
+    433          
+    434          		/* HCLK = SYSCLK					*/
+    435          		RCC_HCLKConfig(RCC_SYSCLK_Div1); 
+    436          
+    437          		/* PCLK2 = HCLK					*/
+    438          		RCC_PCLK2Config(RCC_HCLK_Div1); 
+    439          
+    440          		/* PCLK1 = HCLK/2					*/
+    441          		RCC_PCLK1Config(RCC_HCLK_Div2);
+    442          
+    443          		/* PLLCLK = 12MHz * 6 = 72 MHz	*/
+    444          		RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_6);
+    445          
+    446          		/* PLLCLK = 8MHz * 8 = 64 MHz	*/
+    447          		//RCC_PLLConfig(RCC_PLLSource_HSE_Div2, RCC_PLLMul9);
+    448          
+    449          		/* Enable PLL						*/
+    450          		RCC_PLLCmd(ENABLE);
+    451          
+    452          		/* Wait till PLL is ready		*/
+    453          		while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
+    454          		{
+    455          		}
+    456          
+    457          		/* Select PLL as system clock source */
+    458          		RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+    459          
+    460          		/* Wait till PLL is used as system clock source */
+    461          		while(RCC_GetSYSCLKSource() != 0x08)
+    462          		{
+    463          		}
+    464          	}
+    465          }
+    466          
+    467          /*******************************************************************************
+    468          * Function Name  : Unconfigure_All
+    469          * Description    : set all the RCC data to the default values 
+    470          *                  configure all the GPIO as input
+    471          * Input          : None
+    472          * Output         : None
+    473          * Return         : None
+    474          *******************************************************************************/
+    475          static void Unconfigure_All(void)
+    476          {
+    477          	//RCC_DeInit();
+    478          
+    479          	/* RCC configuration */
+    480          	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ALL, DISABLE);
+    481          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_ALL, DISABLE);
+    482          
+    483          	GPIO_AllAinConfig();
+    484          }
+    485          
+    486          
+    487          /*******************************************************************************
+    488          * Function Name  : GPIO_AllAinConfig
+    489          * Description    : Configure all GPIO port pins in Analog Input mode 
+    490          *                  (floating input trigger OFF)
+    491          * Input          : None
+    492          * Output         : None
+    493          * Return         : None
+    494          *******************************************************************************/
+    495          static void GPIO_AllAinConfig(void)
+    496          {
+    497          	GPIO_InitTypeDef GPIO_InitStructure;
+    498          
+    499          	/* Configure all GPIO port pins in Analog Input mode (floating input trigger OFF) */
+    500          	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;
+    501          	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    502          	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    503          	GPIO_Init(GPIOA, &GPIO_InitStructure);
+    504          	GPIO_Init(GPIOB, &GPIO_InitStructure);
+    505          	GPIO_Init(GPIOC, &GPIO_InitStructure);
+    506          	GPIO_Init(GPIOD, &GPIO_InitStructure);
+    507          	GPIO_Init(GPIOE, &GPIO_InitStructure);
+    508          }
+    509          
+    510          /************************************************
+    511          * Function Name  : EnterLowPowerMode()
+    512          ************************************************/
+    513          void EnterLowPowerMode(void)
+    514          {
+    515          	GPIO_InitTypeDef GPIO_InitStructure;
+    516          
+    517          	//CC1101_DeInitport();
+    518          	
+    519          	//关闭外设
+    520          	led_g_ctrl(0);
+    521          
+    522          	//先关闭所有外设的时钟
+    523          	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ALL, DISABLE);
+    524          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_ALL, DISABLE);
+    525          	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_ALL, DISABLE);
+    526          
+    527          	//但是需要开启PWR模块的时钟
+    528          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE); // Enable PWR clock
+    529          
+    530          
+    531          	//进入低功耗模式
+    532          	EXTI_ClearFlag(0xffff);
+    533          	PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);
+    534          }
+    535          
+    536          /************************************************
+    537          * Function Name  : ExitLowPowerMode()
+    538          ************************************************/
+    539          void ExitLowPowerMode(void)
+    540          {
+    541          	GPIO_InitTypeDef GPIO_InitStructure;
+    542          	//重新配置时钟
+    543          	RCC_Configuration();
+    544          
+    545          	//开启系统中使用到的模块的时钟
+    546          	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOD |
+    547          		RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOE | RCC_APB2Periph_AFIO | RCC_APB2Periph_ADC1|
+    548          		RCC_APB2Periph_SPI1, ENABLE);
+    549          
+    550          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2 | RCC_APB1Periph_SPI2 | RCC_APB1Periph_USB | RCC_APB1Periph_PWR, ENABLE);
+    551          
+    552          	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1 | RCC_AHBPeriph_CRC, ENABLE);
+    553          
+    554          	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+    555          
+    556          	//if(CC1101_Init() == 0)
+    557          	//{
+    558          	//	//设置CC1101模块与基站匹配的频段
+    559          	//	CC1101_Set_Frequency(g_param.cc1101_freq);
+    560          	//	CC1101_Module_Close();
+    561          	//}
+    562          
+    563          	if ((g_param.transfer_mode == TRANSFER_MODE_BLUETOOTH)||(g_param.batch_transfer_mode == TRANSFER_MODE_BLUETOOTH))
+    564          	{
+    565          		led_g_ctrl(1);
+    566          	}
+    567          
+    568          }
+    569          
+    570          extern unsigned char Lcd_RAM[8][128];
+    571          extern vu32 bDeviceState;
+    572          
+    573          //进入U盘模式
+    574          void u_disk_proc(void)
+    575          {
+    576          	unsigned char  *key;
+    577          	unsigned char	*p_lcd_ram_save;
+    578          	OSSchedLock();
+    579          	
+    580          	p_lcd_ram_save = Jmalloc(1024);
+    581          	if (p_lcd_ram_save)
+    582          	{
+    583          		memcpy(p_lcd_ram_save,Lcd_RAM,1024);
+    584          	}
+    585          	
+    586          	gui_FillRect(0,0,LCD_WIDTH,LCD_HEIGHT,BG_COLOR,0);
+    587          	gui_PictureOut(48,14,PIC_USBLINK,0);
+    588          	gui_refresh(0,0,LCD_WIDTH,LCD_HEIGHT);
+    589          	
+    590          	while(USBLink_Insert_Detect() == 0)
+    591          	{	
+    592          		if(bDeviceState != CONFIGURED)
+    593          		{
+    594          			break;
+    595          		}
+    596          
+    597          		Delay(2000);
+    598          	}
+    599          
+    600          	OSSchedUnlock();
+    601          
+    602          	if (p_lcd_ram_save)
+    603          	{
+    604          		memcpy(Lcd_RAM,p_lcd_ram_save,1024);
+    605          		Jfree(p_lcd_ram_save);
+    606          	}
+    607          
+    608          	gui_refresh(0,0,LCD_WIDTH,LCD_HEIGHT);
+    609          }
+    610          
+    611          /*******************************************************************************
+    612          * Function Name  : assert_failed
+    613          * Description    : Reports the name of the source file and the source line number
+    614          *                  where the assert_param error has occurred.
+    615          * Input          : - file: pointer to the source file name
+    616          *                  - line: assert_param error line source number
+    617          * Output         : None
+    618          * Return         : None
+    619          *******************************************************************************/
+    620          
+    621          //void assert_failed(u8* file, u32 line)
+    622          //{ 
+    623          /* User can add his own implementation to report the file name and line number,
+    624          ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    625          
+    626          /* Infinite loop */
+    627          //while (1)
+    628          //{
+    629          //}
+    630          //}
+    631          /******************* (C) COPYRIGHT 2008 STMicroelectronics *****END OF FILE****/
+    632          
+
+   Maximum stack usage in bytes:
+
+     Function          .cstack
+     --------          -------
+     EnterLowPowerMode      8
+     ExitLowPowerMode       8
+     GPIO_AllAinConfig      8
+     RCC_Configuration      8
+     Unconfigure_All        8
+     main                  32
+     memcpy                 8
+     memset                 8
+     task_background       40
+     task_keyboard         24
+     u_disk_proc           16
+
+
+   Section sizes:
+
+     Function/Label                     Bytes
+     --------------                     -----
+     memcpy                               14
+     memset                               20
+     HSEStartUpStatus                      1
+     pos_state                             4
+     task_backgroud_stk                 2048
+     task_ui_stk                        2048
+     task_key_stk                       1024
+     KeyPool                              32
+     pKeyOSQ                               4
+     pKeypressedEvent                      4
+     status_iap                            4
+     nouse                                12
+     bluetooth_module_state                4
+     task_background                     596
+     task_keyboard                       204
+     main                                124
+     RCC_Configuration                   140
+     Unconfigure_All                      26
+     GPIO_AllAinConfig                    84
+     EnterLowPowerMode                    64
+     ExitLowPowerMode                     72
+     u_disk_proc                         148
+     ??DataTable10                         4
+     ??DataTable11                         4
+     ??DataTable13                         4
+     ??DataTable14                         4
+     ??DataTable16                         4
+     ??DataTable18                         4
+     ??DataTable19                         4
+     ?<Constant "Load resource failed">   24
+     ?<Constant "Load SysParam failed">   24
+     ?<Constant "Record Init failed">     20
+     ?<Constant "Recovery failed">        16
+     ?<Constant "POWER OFF">              12
+
+ 
+ 5 169 bytes in section .bss
+    96 bytes in section .rodata
+ 1 520 bytes in section .text
+    16 bytes in section VENDOR_RAM
+ 
+ 1 486 bytes of CODE  memory (+ 34 bytes shared)
+    96 bytes of CONST memory
+ 5 185 bytes of DATA  memory
+
+Errors: none
+Warnings: 16

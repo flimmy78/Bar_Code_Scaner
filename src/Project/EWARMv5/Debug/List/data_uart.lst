@@ -1,0 +1,221 @@
+###############################################################################
+#                                                                             #
+# IAR ANSI C/C++ Compiler V5.30.2.51295/W32 for ARM     31/Mar/2014  10:27:50 #
+# Copyright 1999-2009 IAR Systems AB.                                         #
+#                                                                             #
+#    Cpu mode     =  thumb                                                    #
+#    Endian       =  little                                                   #
+#    Source file  =  D:\work\T6\FW\src\Drivers\data_uart.c                    #
+#    Command line =  D:\work\T6\FW\src\Drivers\data_uart.c -lcN               #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\List\ -o         #
+#                    D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\ --no_cse    #
+#                    --no_unroll --no_inline --no_code_motion --no_tbaa       #
+#                    --no_clustering --no_scheduling --debug --endian=little  #
+#                    --cpu=Cortex-M3 -e --fpu=None --dlib_config "C:\Program  #
+#                    Files\IAR Systems\Embedded Workbench                     #
+#                    5.4\arm\INC\DLib_Config_Full.h" -I                       #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\ -I                 #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\App\ -I          #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Drivers\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\FatFs\ -I        #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\Lib\inc\ -I      #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-CPU\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uC-LIB\ -I  #
+#                    D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS-II\Por #
+#                    ts\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\uCOS\uCOS #
+#                    -II\Source\ -I D:\work\T6\FW\src\Project\EWARMv5\..\..\u #
+#                    COS\uC-Probe\ -I D:\work\T6\FW\src\Project\EWARMv5\..\.. #
+#                    \usb_lib\ -I "C:\Program Files\IAR Systems\Embedded      #
+#                    Workbench 5.4\arm\INC\" -Ol                              #
+#    List file    =  D:\work\T6\FW\src\Project\EWARMv5\Debug\List\data_uart.l #
+#                    st                                                       #
+#    Object file  =  D:\work\T6\FW\src\Project\EWARMv5\Debug\Obj\data_uart.o  #
+#                                                                             #
+#                                                                             #
+###############################################################################
+
+D:\work\T6\FW\src\Drivers\data_uart.c
+      1          /**
+      2           * @file data_uart.c
+      3           * @brief 
+      4           *			串口1的驱动，系统提供给外部的串口，开发阶段可以用于调试
+      5           * @version V0.0.1
+      6           * @author zhongyh
+      7           * @date 2009年12月28日
+      8           * @note
+      9           *
+     10           * @copy
+     11           *
+     12           * 此代码为深圳江波龙电子有限公司项目代码，任何人及公司未经许可不得复制传播，或用于
+     13           * 本公司以外的项目。本司保留一切追究权利。
+     14           *
+     15           * <h1><center>&copy; COPYRIGHT 2009 netcom</center></h1>
+     16           */
+     17          /* Private include -----------------------------------------------------------*/
+     18          #include "stm32f10x_lib.h"
+     19          #include <stdio.h>
+     20          #include <stdlib.h>
+     21          #include <string.h>
+     22          #include "data_uart.h"
+     23          #include "keypad.h"
+     24          
+     25          /* Private typedef -----------------------------------------------------------*/
+     26          /* Private define ------------------------------------------------------------*/
+     27          //#define DATA_UART_EN         GPIO_Pin_7		// PB7,数据串口控制
+     28          
+     29          
+     30          #if 0
+     31          /**
+     32           * @brief	打开数据串口
+     33           * @note	因为外部串口和PN532串口实际上是公用一个串口的，只是利用一个IO控制
+     34          *			一个模拟开关来复用的，此处实际上是使能数据串口这一路的模拟开关
+     35           */
+     36          void ENABLE_DATA_UART(void)
+     37          {
+     38          	PN532_SWITCH_OFF();
+     39          	GPIO_SetBits(GPIOB, DATA_UART_EN);
+     40          }
+     41          
+     42          /**
+     43          * @brief	关闭数据串口
+     44          * @note	因为外部串口和PN532串口实际上是公用一个串口的，只是利用一个IO控制
+     45          *			一个模拟开关来复用的，此处实际上是关闭数据串口这一路的模拟开关
+     46          */
+     47          void DISABLE_DATA_UART(void)
+     48          {
+     49          	GPIO_ResetBits(GPIOB, DATA_UART_EN);
+     50          }
+     51          #endif
+     52          
+     53          /**
+     54          * @brief 初始化数据串口
+     55          */
+     56          void data_uart_init(void)
+     57          {
+     58          	USART_InitTypeDef						USART_InitStructure;
+     59          	GPIO_InitTypeDef						GPIO_InitStructure;
+     60          	NVIC_InitTypeDef						NVIC_InitStructure;
+     61          	
+     62          	NVIC_InitStructure.NVIC_IRQChannel		= USART1_IRQChannel;
+     63          	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+     64          	//NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+     65          	NVIC_InitStructure.NVIC_IRQChannelCmd	= ENABLE;
+     66          	NVIC_Init(&NVIC_InitStructure);
+     67          	
+     68          	
+     69          	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
+     70          	
+     71          	// 目标板使用PB.7切换到数据口
+     72          	//GPIO_InitStructure.GPIO_Pin				= DATA_UART_EN;
+     73          	//GPIO_InitStructure.GPIO_Speed			= GPIO_Speed_50MHz;
+     74          	//GPIO_InitStructure.GPIO_Mode			= GPIO_Mode_Out_PP;
+     75          	//GPIO_Init(GPIOB, &GPIO_InitStructure);
+     76          	//GPIO_ResetBits(GPIOB, DATA_UART_EN);
+     77          
+     78          //#ifndef BOOTCODE_EXIST		//如果没有引导代码	
+     79          	/* Configure USART1 Tx (PA.09) as alternate function push-pull */
+     80          	GPIO_InitStructure.GPIO_Pin				= GPIO_Pin_9;
+     81          	GPIO_InitStructure.GPIO_Mode			= GPIO_Mode_AF_PP;
+     82          	GPIO_InitStructure.GPIO_Speed			= GPIO_Speed_50MHz;
+     83          	GPIO_Init(GPIOA, &GPIO_InitStructure);
+     84          	
+     85          	/* Configure USART1 Rx (PA.10) as input floating */
+     86          	GPIO_InitStructure.GPIO_Pin				= GPIO_Pin_10;
+     87          	GPIO_InitStructure.GPIO_Mode			= GPIO_Mode_IN_FLOATING;
+     88          	GPIO_Init(GPIOA, &GPIO_InitStructure);
+     89          	
+     90          	/* 设置串口参数								*/
+     91          	USART_InitStructure.USART_BaudRate		= 115200;
+     92          	USART_InitStructure.USART_WordLength	= USART_WordLength_8b;
+     93          	USART_InitStructure.USART_StopBits		= USART_StopBits_1;
+     94          	USART_InitStructure.USART_Parity		= USART_Parity_No;
+     95          	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+     96          	USART_InitStructure.USART_Mode			= USART_Mode_Tx | USART_Mode_Rx;
+     97          	//	USART_InitStructure.USART_Clock		= USART_Clock_Disable;
+     98          	//	USART_InitStructure.USART_CPOL			= USART_CPOL_Low;
+     99          	//	USART_InitStructure.USART_CPHA			= USART_CPHA_2Edge;
+    100          	//	USART_InitStructure.USART_LastBit		= USART_LastBit_Disable;
+    101          	USART_Init(USART1, &USART_InitStructure);
+    102          	
+    103          	
+    104          	// 接收和发送中断
+    105          	//	USART_ITConfig(USART1, USART_IT_TXE,  ENABLE);
+    106          	//	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+    107          	
+    108          	USART_Cmd(USART1, ENABLE);
+    109          //#endif	
+    110          	
+    111          	//ENABLE_DATA_UART();
+    112          	/* Enable USART1							*/
+    113          	
+    114          }
+    115          
+    116          /**
+    117           * @brief	发送一个字节
+    118           */
+    119          void data_uart_sendbyte(unsigned char data)
+    120          {
+    121          	USART_SendData(USART1, (unsigned short)data);
+    122          }
+    123          
+    124          /**
+    125           * @brief	接收一个字节
+    126           */
+    127          unsigned char uart_rec_byte(void)
+    128          {
+    129          	int	i = 0;
+    130          	while((USART_GetFlagStatus(USART1,USART_FLAG_RXNE)== RESET)&&(i<400000))
+    131          	{
+    132          		i++;
+    133          	}
+    134          	if (i == 400000) 
+    135          	{
+    136          		return 0x55;
+    137          	}
+    138          	return  USART_ReceiveData(USART1) & 0xFF;              /* Read one byte from the receive data register         */
+    139          }
+    140          
+    141          /**
+    142          * @brief 实现此函数可以利用系统函数printf,方便调试时格式输出调试信息
+    143          */
+    144          int fputc(int ch, FILE *f)
+    145          {
+    146          	//ENABLE_DATA_UART();
+    147          	/* Write a character to the USART */
+    148          	
+    149          	USART_SendData(USART1, (u8) ch);
+    150          	
+    151          	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET)
+    152          	{
+    153          	}
+    154          	//	DISABLE_DATA_UART;
+    155          	return ch;        
+    156          }
+
+   Maximum stack usage in bytes:
+
+     Function           .cstack
+     --------           -------
+     data_uart_init         32
+     data_uart_sendbyte      8
+     fputc                   8
+     uart_rec_byte           8
+
+
+   Section sizes:
+
+     Function/Label     Bytes
+     --------------     -----
+     data_uart_init      148
+     data_uart_sendbyte   16
+     uart_rec_byte        52
+     fputc                32
+     ??DataTable6          4
+
+ 
+ 252 bytes in section .text
+ 
+ 252 bytes of CODE memory
+
+Errors: none
+Warnings: none
