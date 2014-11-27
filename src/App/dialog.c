@@ -2403,72 +2403,72 @@ int dlg_update_icon(int mode,unsigned char refresh_flag)
 	//{
 	//	
 	//}
-	if (g_param.transfer_mode == TRANSFER_MODE_BLUETOOTH)
-	{
+	//if (g_param.transfer_mode == TRANSFER_MODE_BLUETOOTH)
+	//{
 
-		gui_PictureOut(24,0,PIC_BLUETOOTH,refresh_flag);
+	//	gui_PictureOut(24,0,PIC_BLUETOOTH,refresh_flag);
 
-		if (YFBT07_Connect_state())
-		{	
-			//连接状态
-			bluetooth_match_cmd_cnt = 0;
-			gui_PictureOut(0,0,PIC_ANT5,refresh_flag);
-		}
-		else
-		{
-			gui_PictureOut(0,0,PIC_ANT1,refresh_flag);
-			//如果是处于未连接状态，那么就间隔2分钟发送一次匹配命令
-			if (bluetooth_module_state == 0)
-			{
-				bluetooth_state_cnt = 0;
-				if (bluetooth_match_cmd_cnt == 60)
-				{
-					bluetooth_match_cmd_cnt = 0;
-					YFBT07_Enter_Match_Mode();
-				}
-				if (bluetooth_match_cmd_cnt%8 == 0)
-				{
-					YFBT07_SendKey("\x0d",1);
-				}
-				bluetooth_match_cmd_cnt ++;
-			}
-			else
-			{
-				if(bluetooth_state_cnt == 20)
-				{
-					bluetooth_state_cnt = 0;
-					bluetooth_module_state = YFBT07_check();
-				}
-				bluetooth_state_cnt++;
-			}
-		}
-	}
-	else if (g_param.transfer_mode == TRANSFER_MODE_KEYBOARD)
-	{
-		if (bDeviceState == CONFIGURED)
-		{
-			gui_PictureOut(0,0,PIC_KEYPAD_C,refresh_flag);
-		}
-		else
-		{
-			gui_PictureOut(0,0,PIC_KEYPAD_D,refresh_flag);
-		}
-	}
-	else if (g_param.transfer_mode == TRANSFER_MODE_VIRTUAL_COMM)
-	{
-		if (bDeviceState == CONFIGURED)
-		{
-			gui_PictureOut(0,0,PIC_COMM_C,refresh_flag);
-		}
-		else
-		{
-			gui_PictureOut(0,0,PIC_COMM_D,refresh_flag);
-		}
-	}
-	else if (g_param.transfer_mode == TRANSFER_MODE_U_DISK)
-	{
-		gui_PictureOut(0,0,PIC_UDISK,refresh_flag);
-	}
+	//	if (YFBT07_Connect_state())
+	//	{	
+	//		//连接状态
+	//		bluetooth_match_cmd_cnt = 0;
+	//		gui_PictureOut(0,0,PIC_ANT5,refresh_flag);
+	//	}
+	//	else
+	//	{
+	//		gui_PictureOut(0,0,PIC_ANT1,refresh_flag);
+	//		//如果是处于未连接状态，那么就间隔2分钟发送一次匹配命令
+	//		if (bluetooth_module_state == 0)
+	//		{
+	//			bluetooth_state_cnt = 0;
+	//			if (bluetooth_match_cmd_cnt == 60)
+	//			{
+	//				bluetooth_match_cmd_cnt = 0;
+	//				YFBT07_Enter_Match_Mode();
+	//			}
+	//			if (bluetooth_match_cmd_cnt%8 == 0)
+	//			{
+	//				YFBT07_SendKey("\x0d",1);
+	//			}
+	//			bluetooth_match_cmd_cnt ++;
+	//		}
+	//		else
+	//		{
+	//			if(bluetooth_state_cnt == 20)
+	//			{
+	//				bluetooth_state_cnt = 0;
+	//				bluetooth_module_state = YFBT07_check();
+	//			}
+	//			bluetooth_state_cnt++;
+	//		}
+	//	}
+	//}
+	//else if (g_param.transfer_mode == TRANSFER_MODE_KEYBOARD)
+	//{
+	//	if (bDeviceState == CONFIGURED)
+	//	{
+	//		gui_PictureOut(0,0,PIC_KEYPAD_C,refresh_flag);
+	//	}
+	//	else
+	//	{
+	//		gui_PictureOut(0,0,PIC_KEYPAD_D,refresh_flag);
+	//	}
+	//}
+	//else if (g_param.transfer_mode == TRANSFER_MODE_VIRTUAL_COMM)
+	//{
+	//	if (bDeviceState == CONFIGURED)
+	//	{
+	//		gui_PictureOut(0,0,PIC_COMM_C,refresh_flag);
+	//	}
+	//	else
+	//	{
+	//		gui_PictureOut(0,0,PIC_COMM_D,refresh_flag);
+	//	}
+	//}
+	//else if (g_param.transfer_mode == TRANSFER_MODE_U_DISK)
+	//{
+	//	gui_PictureOut(0,0,PIC_UDISK,refresh_flag);
+	//}
 
 
 	// 显示电池电量

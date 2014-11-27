@@ -428,6 +428,16 @@ void DMA1_Channel1_IRQHandler(void)
 *******************************************************************************/
 void DMA1_Channel2_IRQHandler(void)
 {
+	//OSIntEnter();
+	//if (DMA_GetITStatus(DMA1_IT_TC2))
+	//{
+	//	//数据发送完打开DMA接收通道
+	//	DMA_Cmd(DMA1_Channel2, DISABLE);
+	//}
+
+	///* clear DMA flag */
+	//DMA_ClearFlag(DMA1_FLAG_TC2 | DMA1_FLAG_TE2);
+	//OSIntExit();
 }
 
 /*******************************************************************************
@@ -827,6 +837,32 @@ void USART2_IRQHandler(void)
 *******************************************************************************/
 void USART3_IRQHandler(void)
 {
+//#if(USART_RX_MODE == USART_RX_DMA_MODE)
+//	unsigned int temp = 0;  
+//	unsigned short i = 0;  
+//
+//	if(USART_GetITStatus(USART3, USART_IT_IDLE) != RESET)  
+//	{  
+//		//USART_ClearFlag(USART1,USART_IT_IDLE);  
+//		temp = USART3->SR;  
+//		temp = USART3->DR; //清USART_IT_IDLE标志  
+//		DMA_Cmd(DMA1_Channel3,DISABLE);  
+//
+//		temp = G_RECEIV_BUF_LENGTH - DMA_GetCurrDataCounter(DMA1_Channel3);  
+//		for (i = 0;i < temp;i++)  
+//		{  
+//			if (UE988_RxISRHandler(g_receive_buff[i])>0)
+//			{
+//				break;
+//			}
+//		}  
+//
+//		//设置传输数据长度  
+//		DMA_SetCurrDataCounter(DMA1_Channel3,G_RECEIV_BUF_LENGTH);  
+//		//打开DMA  
+//		DMA_Cmd(DMA1_Channel3,ENABLE);  
+//	}   
+//#else
 	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
 	{   
 		recv_data	=	USART_ReceiveData(USART3) & 0xff;
@@ -835,6 +871,7 @@ void USART3_IRQHandler(void)
 	}
 	else if(USART_GetITStatus(USART3, USART_IT_TC) != RESET)
 	{
+		//锟芥墦寮�鎺ユ敹涓柇
 		USART_ClearITPendingBit(USART3, USART_IT_TC);
 		USART_ITConfig(USART3, USART_IT_TC, DISABLE);
 		(void)USART_ReceiveData(USART3);
@@ -845,16 +882,7 @@ void USART3_IRQHandler(void)
 	{
 		Comm_IsrSendBytes(COMM3);
 	}
-#if 0
-	if (USART_GetFlagStatus(USART3, USART_IT_RXNE) != RESET)
-	{
-		unsigned char c;
-		c = USART_ReceiveData(USART3);
-		USART_ClearITPendingBit(USART3, USART_IT_RXNE);
-		UE988_RxISRHandler(c);
-	}
-#endif
-
+//#endif
 }
 
 /*******************************************************************************

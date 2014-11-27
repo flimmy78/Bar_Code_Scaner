@@ -42,8 +42,6 @@
 #include "data_transfer.h"
 #include "usb_lib.h"
 #include "PCUsart.h"
-//#include "http_protocol.h"
-//#include "em310_driver.h"
 #include "JMemory.h"
 #include "usb_pwr.h"
 /* Private define ------------------------------------------------------------*/
@@ -200,50 +198,52 @@ static void task_background(void *pp)
 #endif
 
 	//初始化存储记录的模块
-	if(record_module_init())
+	if(record_init())
 	{
 		gui_clear(BG_COLOR);
 		//gui_TextOut_ext(CENTER_ALIGN,60 , "请检查是否插入",0); // y += get_dlg_fontsize();
 		//gui_TextOut_ext(CENTER_ALIGN,73 , "存储卡",0);
 		//gui_TextOutEx(CENTER_ALIGN,26 , "Record module Init",0,1);
 		gui_TextOut(0,50 , "Record Init failed",0,1);
-		goto sys_err_handle;
+		//goto sys_err_handle;
+		while(1);
 	}
 
-	if (recover_record_by_logfile())
-	{
-		gui_clear(BG_COLOR);
-		//gui_TextOut_ext(CENTER_ALIGN,60 , "记录恢复失败",0); // y += get_dlg_fontsize();
-		//gui_TextOutEx(CENTER_ALIGN,26 , "Records recovery",0,1); // y += get_dlg_fontsize();
-		gui_TextOut(0,50 , "Recovery failed",0,1);
-		goto sys_err_handle;
-	}
+	//if (recover_record_by_logfile())
+	//{
+	//	gui_clear(BG_COLOR);
+	//	//gui_TextOut_ext(CENTER_ALIGN,60 , "记录恢复失败",0); // y += get_dlg_fontsize();
+	//	//gui_TextOutEx(CENTER_ALIGN,26 , "Records recovery",0,1); // y += get_dlg_fontsize();
+	//	gui_TextOut(0,50 , "Recovery failed",0,1);
+	//	goto sys_err_handle;
+	//}
        
 	//检测条形码阅读器
-	UE988_Init(g_param.decoder_switch_map);
+	//scanner_mod_init();
+    UE988_Init(g_param.decoder_switch_map);  
 
 	//蓝牙模块初始化
-	bluetooth_module_state = YFBT07_init();
-        //YFBT07_Test();
+	//bluetooth_module_state = YFBT07_init();
+    //YFBT07_Test();
 
 	//初始化电池电压检测以及充电状态检测的模块
 	InitPowerDetectModule();  
 	
 	////初始化
 	device_init_by_setting();
-	if ((USBLink_Insert_Detect() == 0) && (g_param.transfer_mode == TRANSFER_MODE_U_DISK))
-	{
-		while((bDeviceState != CONFIGURED)&&(time_out < 15))
-		{
-			time_out++;
-			OSTimeDlyHMSM(0,0,0,100);
-		}
+	//if ((USBLink_Insert_Detect() == 0) && (g_param.transfer_mode == TRANSFER_MODE_U_DISK))
+	//{
+	//	while((bDeviceState != CONFIGURED)&&(time_out < 15))
+	//	{
+	//		time_out++;
+	//		OSTimeDlyHMSM(0,0,0,100);
+	//	}
 
-		if (bDeviceState == CONFIGURED)
-		{
-			u_disk_proc();
-		}
-	}
+	//	if (bDeviceState == CONFIGURED)
+	//	{
+	//		u_disk_proc();
+	//	}
+	//}
 	OSTimeDlyHMSM(0,0,0,100);
 	// 进入显示主进程     
 	// 创建进程间的信号量
@@ -560,6 +560,7 @@ void ExitLowPowerMode(void)
 	//	CC1101_Module_Close();
 	//}
 
+        //UE988_GPIO_config();
 	if ((g_param.transfer_mode == TRANSFER_MODE_BLUETOOTH)||(g_param.batch_transfer_mode == TRANSFER_MODE_BLUETOOTH))
 	{
 		led_g_ctrl(1);

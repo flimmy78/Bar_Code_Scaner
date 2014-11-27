@@ -14,7 +14,7 @@ unsigned char				edit_state;					//编辑框状态
 
 extern unsigned char		g_editValue[MAX_EDIT][MAX_EDITNUM];//编辑框的全局变量
 extern unsigned char		gFontSize;			// 字号、
-extern TZD_RECORD			ZD_rec;					//字典记录
+//extern TZD_RECORD			ZD_rec;					//字典记录
 extern	TTerminalPara		g_param;
 
 static unsigned char		edit_buf[MAX_EDITNUM];
@@ -597,7 +597,7 @@ unsigned char edit_chinese_proc(unsigned char key,unsigned char input_method,uns
 	return if_update_cursor;
 }
 
-
+#if 0
 /**
 * @brief 显示系统设置的字典名称列表
 * @param[in] unsigned char start_display_item		开始显示的项
@@ -881,7 +881,7 @@ static unsigned char display_ZD_value_list(unsigned char index,unsigned char sta
 
 	return (i - start_display_item);
 }
-
+#endif
 /**
 * @brief 在字典输入时处理输入编辑框的键值
 * @param[in] unsigned char key						输入的键值
@@ -899,6 +899,7 @@ static unsigned char display_ZD_value_list(unsigned char index,unsigned char sta
 */
 void edit_ZD_proc(unsigned char key,unsigned char *code)
 {
+#if 0
 	unsigned char datetime_bcd[7];
 	unsigned char datetime_str[11];
 	unsigned int	i,j;
@@ -1061,5 +1062,6 @@ void edit_ZD_proc(unsigned char key,unsigned char *code)
 	default:
 		break;
 	}
+#endif
 }
 #endif

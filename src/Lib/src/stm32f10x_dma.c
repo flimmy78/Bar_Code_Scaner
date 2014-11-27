@@ -320,6 +320,26 @@ void DMA_ITConfig(DMA_Channel_TypeDef* DMAy_Channelx, u32 DMA_IT, FunctionalStat
   }
 }
 
+/**
+  * @brief  Sets the number of data units in the current DMAy Channelx transfer.
+  * @param  DMAy_Channelx: where y can be 1 or 2 to select the DMA and 
+  *         x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.
+  * @param  DataNumber: The number of data units in the current DMAy Channelx
+  *         transfer.   
+  * @note   This function can only be used when the DMAy_Channelx is disabled.                 
+  * @retval None.
+  */
+void DMA_SetCurrDataCounter(DMA_Channel_TypeDef* DMAy_Channelx, u16 DataNumber)
+{
+  /* Check the parameters */
+  assert_param(IS_DMA_ALL_PERIPH(DMAy_Channelx));
+  
+/*--------------------------- DMAy Channelx CNDTR Configuration ---------------*/
+  /* Write to DMAy Channelx CNDTR */
+  DMAy_Channelx->CNDTR = DataNumber;  
+}
+
+
 /*******************************************************************************
 * Function Name  : DMA_GetCurrDataCounter
 * Description    : Returns the number of remaining data units in the current
